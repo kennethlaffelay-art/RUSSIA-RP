@@ -1,0 +1,39 @@
+name: Publish RUSSIA v5.2
+on:
+  push:
+    branches: [release/v52-cache-entry]
+    paths: ['.github/workflows/publish-v52.yml']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: client-v5.2-cache-recovery
+      SHA: 218ead3333e5caaff5d9abd5756b704e27f11eae451ac516c4d0a57c7719c0a1
+    steps:
+      - name: Verify the signed package and publish it
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v52"
+          for file in dex_edits.py patch_base.py client-v52.patch; do
+            curl -fsSL --retry 3 "$src/$file" -o "$file"
+          done
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.1-play/RUSSIA_v5.1.apk" -o base.apk
+          echo 'f972693f64f5941a496ef00509075bcc6fa5375b7f4dee36fe120cff71c28ba6  base.apk' | sha256sum -c
+          python3 patch_base.py base.apk RUSSIA_v5.2.apk
+          git apply --binary client-v52.patch
+          echo "$SHA  RUSSIA_v5.2.apk" | sha256sum -c
+          cat > notes.md <<'NOTES'
+          Установите APK поверх v5.1. Откройте меню и нажмите «Играть». На штатном экране с медведем клиент покажет скачивание, проверку архива и распаковку. Если связь оборвётся, кнопка «Повторить» продолжит скачивание с сохранённого места. Если памяти мало, клиент покажет, сколько нужно освободить.
+
+          Исправлена ошибка Android при открытии игровой активности Multiplayer. Версия пакета Android 1.6.4 (20). После проверки и распаковки кэша на эмуляторе Android 11 воспроизводится отдельный нативный вылет при инициализации текстур шрифта. Вход на сервер в этой сборке пока не подтверждён.
+          NOTES
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" RUSSIA_v5.2.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "RUSSIA v5.2 — восстановление загрузки кэша" --notes-file notes.md --prerelease
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]|select(.name=="RUSSIA_v5.2.apk")|.digest' | grep -Fx "sha256:$SHA"
