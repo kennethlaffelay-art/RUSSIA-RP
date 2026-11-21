@@ -72,6 +72,21 @@ jobs:
             adb logcat -d -b crash | grep -E 'FATAL EXCEPTION|signal [0-9]+|Caused by: |#[0-9]+ pc|Abort message:|Exception:|Error:' | tail -55 || true
             adb logcat -d -s RussiaCache:I | tail -12 || true
             adb logcat -d | grep -Ei 'dlopen failed|UnsatisfiedLinkError|unimplemented OpenGL|failed to load|cannot load|could not open|cannot open|missing texture' | grep -viE 'keystore|chromium|systemui|provider|apex|com.google|vulkan|android.hardware' | tail -30 || true
+            adb exec-out cat /sdcard/Weik/SAMP/samp_log.txt > new-game.log 2>/dev/null || true
+            adb exec-out cat /sdcard/Weik/SAMP/crash_log.log > new-crash.log 2>/dev/null || true
+            ls -l new-game.log new-crash.log
+            adb logcat -d -v brief > emulator-session.log
+            python3 - <<'PYLOG'
+          import pathlib,re
+          for name in ('new-game.log','new-crash.log','emulator-session.log'):
+              raw=pathlib.Path(name).read_bytes().decode('utf-8','replace')
+              rows=[]
+              for line in raw.splitlines():
+                  if re.search(r'login|password|nickname|\bchat\b|server address|token|Bearer|Account',line,re.I): continue
+                  if re.search(r'(load(ing|ed)? (?:gta|base|lib|game|text|gui|settings|font|script|peds|handling|vehicle)|database not found|texture .{0,80}not found|file not found|libGame.so address|libmultiplayer.so address|initializ(?:e|ing) (?:game|client)|NVEvent|RwEngine|file system|failed to create (?:surface|context)|CFileMgr|GTASA|samp:|gta:|Backtrace:|libGame\.so\s*\+|libmultiplayer\.so\s*\+|SIGSEGV)',line,re.I):
+                      rows.append(re.sub(r'/data/app/[^ ]{15,}?(?=/lib|/base\.apk)','<APK>', line).strip()[:300])
+              print(name,*rows[-65:],sep='\n')
+          PYLOG
             adb shell df -k /data
             adb shell dumpsys activity activities | grep -m 1 -E 'mResumedActivity|topResumedActivity' || true
             adb logcat -d -b crash | grep -E 'signal [0-9]+ \(SIG[A-Z]+\)|FATAL EXCEPTION|>>> com.wn.blackrussia <<<' | tail -10 || true

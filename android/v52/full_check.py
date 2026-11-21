@@ -10,7 +10,9 @@ def resumed():
     return next((l.strip() for l in dump.splitlines() if 'mResumedActivity' in l or 'topResumedActivity=' in l),'')
 def nodes():
     try:
-        adb('shell','uiautomator','dump','/sdcard/stock-screen.xml')
+        adb('shell','rm','-f','/sdcard/stock-screen.xml')
+        output=adb('shell','uiautomator','dump','/sdcard/stock-screen.xml')
+        if 'dumped to' not in output:return []
         return ET.fromstring(adb('exec-out','cat','/sdcard/stock-screen.xml')).findall('.//node')
     except (ValueError,ET.ParseError,subprocess.SubprocessError):return []
 def tap(node):
@@ -208,7 +210,8 @@ def execute():
         if where=='download' and time.monotonic()-last_advance>16:
             items=nodes(); msg=resource(items,'loadingText'); retry=resource(items,'repeatButton')
             if retry is not None and msg is not None:
-                raise RuntimeError('Unexpected cache error: '+msg.get('text',''))
+                if not (cut and saved is not None and size>saved and 'прервана' in msg.get('text','')):
+                    raise RuntimeError('Unexpected cache error: '+msg.get('text',''))
         c=crash()
         if c:raise RuntimeError('Crash before cache commit: '+json.dumps(c))
         time.sleep(2)
