@@ -1,0 +1,62 @@
+name: Check the released client from download to server entry
+on:
+  push:
+    branches: [qa/v51-complete-entry]
+    paths: ['qa/full-entry/**', '.github/workflows/full-game-entry.yml']
+permissions:
+  contents: read
+jobs:
+  entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    steps:
+      - name: Test a fresh Android installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avds"
+          mkdir -p "$ANDROID_AVD_HOME"
+          "$sdk/sdkmanager" "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64" >android-sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n playtest -k "system-images;android-30;google_apis;x86_64" --device pixel_4
+          sed -i '/^disk.dataPartition.size=/d' "$ANDROID_AVD_HOME/playtest.avd/config.ini"
+          echo 'disk.dataPartition.size=14000M' >>"$ANDROID_AVD_HOME/playtest.avd/config.ini"
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa tesseract-ocr tesseract-ocr-rus
+          df -h "$RUNNER_TEMP"
+          emulator -list-avds
+          emulator -accel-check
+          adb start-server
+          emulator -avd playtest -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 4096 -partition-size 14000 >emulator.log 2>&1 &
+          emupid=$!
+          trap 'adb emu kill >/dev/null 2>&1 || true; tail -35 emulator.log' EXIT
+          ready=0
+          for attempt in $(seq 1 100); do
+            if ! kill -0 "$emupid" 2>/dev/null; then tail -70 emulator.log; exit 1; fi
+            if [[ "$(timeout 4 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
+          adb shell wm dismiss-keyguard
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell df -k /data
+          avail=$(adb shell df -k /data | awk 'NR==2 {print $4}')
+          test "$avail" -gt 6500000
+          adb shell getprop ro.product.cpu.abilist
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/qa/full-entry"
+          curl -fsSL --retry 3 "$src/full_check.py" -o full_check.py
+          curl -fsSL --retry 3 "$src/samples.json" -o samples.json
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.1-play/RUSSIA_v5.1.apk" -o client.apk
+          echo 'f972693f64f5941a496ef00509075bcc6fa5375b7f4dee36fe120cff71c28ba6  client.apk' | sha256sum -c
+          adb install -g client.apk
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          if ! python3 -u full_check.py; then
+            adb shell df -k /data
+            adb shell dumpsys activity activities | grep -m 1 -E 'mResumedActivity|topResumedActivity' || true
+            adb logcat -d -b crash | grep -E 'signal [0-9]+ \(SIG[A-Z]+\)|FATAL EXCEPTION|>>> com.wn.blackrussia <<<' | tail -10 || true
+            exit 1
+          fi
