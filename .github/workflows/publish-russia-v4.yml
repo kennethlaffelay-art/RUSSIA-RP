@@ -1,0 +1,48 @@
+name: Publish signed RUSSIA v4 APK
+on:
+  push:
+    branches: [release/github-cache-client-v4]
+    paths:
+      - 'android/v4/**'
+      - '.github/workflows/publish-russia-v4.yml'
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: client-v4-github-cache
+      BASE_SHA256: e27b60a1670dba072c7b5d4f7e8c0b7317659d3e8973b786e0210ee51444f980
+      APK_SHA256: bcc7e70e2e38f16c90de7e2cc8ba4acb01235a30b02190e3f6a99f6aa6726c5b
+    steps:
+      - name: Reconstruct and verify the signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 3 --output client.patch "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v4/client-v4.patch"
+          curl --fail --location --retry 3 --output RUSSIA_v4.apk "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-e27b60a1670dba072c7b5d4f7e8c0b73-7c834b9b3cce/RUSSIA_v3.apk"
+          echo "$BASE_SHA256  RUSSIA_v4.apk" | sha256sum --check --strict
+          git apply --binary client.patch
+          echo "$APK_SHA256  RUSSIA_v4.apk" | sha256sum --check --strict
+      - name: Publish the verified APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            digest=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[] | select(.name=="RUSSIA_v4.apk") | .digest')
+            test "$digest" = "sha256:$APK_SHA256"
+            exit 0
+          fi
+          cat > release.md <<'NOTES'
+          Установите RUSSIA_v4.apk. При первом запуске разрешите доступ к файлам: клиент скачает кэш (1,49 ГБ) из релиза этого репозитория, проверит SHA-256 и установит его в папку Weik. Для первой установки оставьте около 5,6 ГБ свободного места. Прерванную загрузку можно продолжить.
+          
+          Версия Android-клиента 1.6.1 (17). Подпись этой сборки отличается от RUSSIA_v3.apk. Android не установит её поверх v3 как обычное обновление. Перед удалением прежнего приложения сохраните нужные данные.
+          NOTES
+          gh release create "$TAG" RUSSIA_v4.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "RUSSIA v4 — клиент с загрузкой кэша с GitHub" --notes-file release.md --latest=false
