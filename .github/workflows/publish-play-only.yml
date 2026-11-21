@@ -87,7 +87,7 @@ jobs:
           adb install -g old.apk
           adb install -r -g new.apk
           adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
-          curl -fsSL --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v5/smoke_ui.py" -o smoke_ui.py
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v5.1/smoke_ui.py" -o smoke_ui.py
           if ! python3 smoke_ui.py; then
             adb shell dumpsys activity activities | grep -m 1 -E 'mResumedActivity|topResumedActivity' || true
             adb shell uiautomator dump /sdcard/visible.xml >/dev/null 2>&1 || true
