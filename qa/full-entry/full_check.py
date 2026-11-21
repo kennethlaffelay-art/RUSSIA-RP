@@ -72,7 +72,17 @@ def crash():
     signals=re.findall(r'signal\s+\d+\s+\(([A-Z]+)\)',buf)
     java=re.findall(r'\b([\w.]+(?:Exception|Error))\b',buf)
     libs=re.findall(r'#\d+\s+pc\s+[\da-f]+\s+[^\n]*?/([^ /!(]+\.so)\b',buf,re.I)
-    return {'signals':sorted(set(signals)),'exceptions':list(dict.fromkeys(java))[:4],'frames':list(dict.fromkeys(libs))[:7]}
+    verifier=[]
+    for line in buf.splitlines():
+        if 'java.lang.VerifyError:' in line:
+            msg=line.split('java.lang.VerifyError:',1)[1].strip()
+            # A verifier message contains bytecode types and the failing method, not user input.
+            if 'rejected class' in msg.lower() or 'failed to verify' in msg.lower():
+                verifier.append(msg.split('(declaration of')[0].strip()[:1600])
+    calls=re.findall(r'\bat ((?:com\.wn\.blackrussia|blackrussia\.online)\.[\w.$<>]+)\(',buf)
+    return {'signals':sorted(set(signals)),'exceptions':list(dict.fromkeys(java))[:4],
+            'frames':list(dict.fromkeys(libs))[:7],'verifier':verifier[:3],
+            'java_calls':list(dict.fromkeys(calls))[:8]}
 
 def capture_words():
     # Screenshots stay inside the throwaway runner. Only known UI labels enter the report.
