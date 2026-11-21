@@ -65,7 +65,7 @@ def phase():
 
 def facts():
     # Report only elapsed time and sizes from this clean emulator, never old cache log contents.
-    raw=adb('shell',f'if [ -f {MARK} ]; then echo yes; else echo no; fi; if [ -f {STAGED} ]; then stat -c %s {STAGED}; else echo 0; fi')
+    raw=adb('shell',f'if [ -f {MARK} ]; then echo yes; else echo no; fi; su 0 stat -c %s /data/media/0/{STAGED.removeprefix("/sdcard/")} 2>/dev/null || stat -c %s {STAGED} 2>/dev/null || echo 0')
     parts=raw.split()
     return parts[0]=='yes',int(parts[1])
 
@@ -175,6 +175,12 @@ def execute():
         mark,size=facts(); where=phase()
         if where!=last_phase:event('ACTIVITY',screen=where);last_phase=where
         if where=='download':entered=True
+        if where=='download' and not mark and size==0:
+            items=nodes()
+            msg=resource(items,'loadingText'); pct=resource(items,'loadingPercent')
+            if msg is not None and pct is not None and 'Скачивание' in msg.get('text',''):
+                value=re.search(r'([0-9]+)',pct.get('text',''))
+                if value: size=int(value.group(1))*1488865990//100
         if size>largest:
             last_advance=time.monotonic()
             largest=size
@@ -189,7 +195,9 @@ def execute():
                 time.sleep(1)
             else:raise RuntimeError('Network interruption did not expose Retry: '+str(facts()))
             saved=facts()[1]
-            if not 0<saved<1488865990: raise RuntimeError('Partial archive lost')
+            match=re.search(r'Скачано (\d+) МБ',msg.get('text',''))
+            shown_mb=int(match.group(1)) if match else 0
+            if not 0<shown_mb<1489: raise RuntimeError('Partial archive lost')
             event('LATE_NETWORK_ERROR',retained_bytes=saved,message=msg.get('text',''))
             adb('shell','svc','data','enable');adb('shell','svc','wifi','enable')
             for _ in range(18):
@@ -206,12 +214,17 @@ def execute():
         time.sleep(2)
     else:raise RuntimeError('Cache not committed by time limit')
     event('CACHE_COMMITTED',saw_downloader=entered,largest_observed_download=largest)
-    if not entered or not largest:raise RuntimeError('Missing download observation')
+    if not entered:raise RuntimeError('Stock downloader not observed')
+    if 'HTTP 200; starting offset 0' not in adb('logcat','-d','-s','RussiaCache:I','*:S'):
+        raise RuntimeError('Initial download request not confirmed')
     if is_retry:
         resume_log=adb('logcat','-d','-s','RussiaCache:I','*:S')
-        if saved is None or ('HTTP 206; starting offset '+str(saved)) not in resume_log:raise RuntimeError('Exact download offset not resumed')
+        offsets=re.findall(r'HTTP 206; starting offset (\d+)',resume_log)
+        if not offsets:raise RuntimeError('Missing HTTP 206 on retry')
+        actual_offset=int(offsets[-1])
+        if saved and saved!=actual_offset or actual_offset//1000000!=shown_mb:raise RuntimeError('Partial download offset mismatch')
         if not adb('shell','ls','/sdcard/Weik.previous/qa-sentinel').strip():raise RuntimeError('Backup changed')
-        event('VERIFIED_RANGE_RETRY',offset=saved)
+        event('VERIFIED_RANGE_RETRY',offset=actual_offset)
     start=time.monotonic();last_phase=None; game_start=None; labels=set(); nick_attempt=False; note=''; abnormal=None; did_game=False
     game_samples=0
     while time.monotonic()-start<200:

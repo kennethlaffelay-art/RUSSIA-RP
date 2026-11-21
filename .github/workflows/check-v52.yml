@@ -62,10 +62,16 @@ jobs:
           python3 patch_base.py base.apk RUSSIA_v5.2.apk
           git apply --binary client-v52.patch
           echo '218ead3333e5caaff5d9abd5756b704e27f11eae451ac516c4d0a57c7719c0a1  RUSSIA_v5.2.apk' | sha256sum -c
-          adb install -g base.apk
-          adb install -r -g RUSSIA_v5.2.apk
+          abi=arm64-v8a
+          if [[ "$SCENARIO" == fresh ]]; then abi=armeabi-v7a; fi
+          echo "Testing game ABI $abi"
+          adb install -g --abi "$abi" base.apk
+          adb install -r -g --abi "$abi" RUSSIA_v5.2.apk
           adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
           if ! python3 -u full_check.py; then
+            adb logcat -d -b crash | grep -E 'FATAL EXCEPTION|signal [0-9]+|Caused by: |#[0-9]+ pc|Abort message:|Exception:|Error:' | tail -55 || true
+            adb logcat -d -s RussiaCache:I | tail -12 || true
+            adb logcat -d | grep -Ei 'dlopen failed|UnsatisfiedLinkError|unimplemented OpenGL|failed to load|cannot load|could not open|cannot open|missing texture' | grep -viE 'keystore|chromium|systemui|provider|apex|com.google|vulkan|android.hardware' | tail -30 || true
             adb shell df -k /data
             adb shell dumpsys activity activities | grep -m 1 -E 'mResumedActivity|topResumedActivity' || true
             adb logcat -d -b crash | grep -E 'signal [0-9]+ \(SIG[A-Z]+\)|FATAL EXCEPTION|>>> com.wn.blackrussia <<<' | tail -10 || true
