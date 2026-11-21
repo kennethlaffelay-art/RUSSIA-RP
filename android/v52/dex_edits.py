@@ -60,10 +60,30 @@ def fix_game(data):
 def move_worker(data):
     d=Dex(data);p=d.cls('Lblackrussia/online/Downloader$DownloadFilesTask;')
     n=d.u32(96);end=d.u32(100)+32*n
+    # Close the removed class_data_item in the contiguous section. ART verifies
+    # every nonempty data item has an owning class, including those no longer referenced.
+    data_start=d.u32(p+24)
+    pos=data_start
+    counts=[]
+    for _ in range(4):
+        count,pos=d.leb(pos)
+        counts.append(count)
+    for _ in range(2*sum(counts[:2])+3*sum(counts[2:])):
+        _,pos=d.leb(pos)
+    data_end=pos
+    removed=data_end-data_start
     d.b[p:end]=d.b[p+32:end]+bytes(32)
+    for definition in range(d.u32(100),end-32,32):
+        offset=d.u32(definition+24)
+        if offset>data_start:
+            struct.pack_into('<I',d.b,definition+24,offset-removed)
     struct.pack_into('<I',d.b,96,n-1)
     m=d.u32(52)
     offsets={struct.unpack_from('<H',d.b,m+4+12*i)[0]:m+4+12*i for i in range(d.u32(m))}
     assert 0xf000 not in offsets and d.u32(offsets[6]+4)==n
+    section=offsets[0x2000]; limit=d.u32(section+12+8)
+    assert d.u32(section+8)<=data_start<data_end<=limit
+    d.b[data_start:limit]=d.b[data_end:limit]+bytes(removed)
+    struct.pack_into('<I',d.b,section+4,d.u32(section+4)-1)
     struct.pack_into('<I',d.b,offsets[6]+4,n-1)
     return finish(d.b)

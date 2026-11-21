@@ -25,6 +25,9 @@ def wait_until_play():
     last=''
     for _ in range(45):
         last=resumed()
+        failure=crash()
+        if failure:
+            raise RuntimeError('Startup crash: '+json.dumps(failure))
         if 'online.Downloader' in last or archive_bytes()>0:raise Exception('Unexpected downloader before Play')
         items=nodes()
         # The throwaway emulator has never acknowledged the stock first-launch notice.

@@ -54,14 +54,14 @@ jobs:
           test "$avail" -gt 6500000
           adb shell getprop ro.product.cpu.abilist
           src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v52"
-          for file in full_check.py samples.json patch_base.py client-v52.patch; do
+          for file in full_check.py samples.json dex_edits.py patch_base.py client-v52.patch; do
             curl -fsSL --retry 3 "$src/$file" -o "$file"
           done
           curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.1-play/RUSSIA_v5.1.apk" -o base.apk
           echo 'f972693f64f5941a496ef00509075bcc6fa5375b7f4dee36fe120cff71c28ba6  base.apk' | sha256sum -c
           python3 patch_base.py base.apk RUSSIA_v5.2.apk
           git apply --binary client-v52.patch
-          echo '0f9c45e54ed946be4b8a3e999819c93ecdf0454a433306bf0e718c7c40b0ad02  RUSSIA_v5.2.apk' | sha256sum -c
+          echo '218ead3333e5caaff5d9abd5756b704e27f11eae451ac516c4d0a57c7719c0a1  RUSSIA_v5.2.apk' | sha256sum -c
           adb install -g base.apk
           adb install -r -g RUSSIA_v5.2.apk
           adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
