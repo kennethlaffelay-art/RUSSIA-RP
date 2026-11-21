@@ -1,0 +1,97 @@
+name: Publish Android client with the stock Play download screen
+on:
+  push:
+    branches: [release/client-v5-play]
+    paths:
+      - 'android/v5/**'
+      - '.github/workflows/publish-russia-v5.yml'
+permissions:
+  contents: read
+concurrency:
+  group: russia-rp-client-v5-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    env:
+      TAG: client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58
+      APK_SHA: aae8ff4b4e0a06ccd3e49baaf43ea9ccfbd55b54fc087ed644f7620961b08cb0
+      CACHE_SHA: 1cdd9c76725fdd1ab07f196a9e5fdcafd5c5808ba883f71701cfa5e0d33d77ea
+    steps:
+      - name: Restore verified inputs and prepare both assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v5"
+          for file in prepare_cache.py prepare_client.py verify_client.py patch_base.py signed-v5.patch; do
+            curl --fail --location --retry 3 --output "$file" "$src/$file"
+          done
+          curl --fail --location --retry 3 --output RUSSIA_v3.apk "$base/russia-e27b60a1670dba072c7b5d4f7e8c0b73-7c834b9b3cce/RUSSIA_v3.apk"
+          echo 'e27b60a1670dba072c7b5d4f7e8c0b7317659d3e8973b786e0210ee51444f980  RUSSIA_v3.apk' | sha256sum -c
+          curl --fail --location --retry 3 --output stock.zip "$base/russia-f701d99e857a2d9e5fe9127ab00c0161-b9180d3ebef8/Rkkdev.zip"
+          python3 prepare_cache.py stock.zip Rkkdev.zip
+          python3 patch_base.py RUSSIA_v3.apk RUSSIA_v5.apk
+          git apply --binary signed-v5.patch
+          echo "$APK_SHA  RUSSIA_v5.apk" | sha256sum -c
+          python3 verify_client.py RUSSIA_v3.apk RUSSIA_v5.apk Rkkdev.zip
+      - name: Publish APK and cache together
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            cat > notes.txt <<'NOTES'
+          Установите RUSSIA_v5.apk поверх v4. При открытии доступны обычное меню и настройки клиента. Нажмите «Играть»: проверка и скачивание игровых файлов с GitHub идут на штатном экране с медведем, подсказками и процентом загрузки. Отдельно скачивать ZIP не требуется.
+          
+          Версия 1.6.2 (18). На первую установку кэша нужно около 5,6 ГБ свободного места. После перехода с v4 штатный загрузчик может один раз скачать кэш заново.
+          NOTES
+            gh release create "$TAG" --draft --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "RUSSIA v5 — загрузка по кнопке «Играть»" --notes-file notes.txt
+          fi
+          for file in RUSSIA_v5.apk Rkkdev.zip; do
+            expected="$APK_SHA"; if [[ "$file" == Rkkdev.zip ]]; then expected="$CACHE_SHA"; fi
+            digest=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq ".assets[] | select(.name==\"$file\") | .digest")
+            if [[ -z "$digest" ]]; then gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY"; fi
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq ".assets[] | select(.name==\"$file\") | .digest" | grep -Fx "sha256:$expected"
+          done
+          if [[ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" == true ]]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
+  smoke:
+    name: Check the stock Play flow on Android 11
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    permissions:
+      contents: read
+    steps:
+      - name: Boot Android and exercise the installed release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          "$sdk/sdkmanager" "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64" >android-sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n playtest -k "system-images;android-30;google_apis;x86_64" --device pixel_4
+          emulator -avd playtest -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 2304 -partition-size 7400 >emulator.log 2>&1 &
+          trap 'adb emu kill >/dev/null 2>&1 || true' EXIT
+          timeout 300 bash -c 'adb wait-for-device; until adb shell getprop sys.boot_completed | grep -q 1; do sleep 3; done'
+          adb shell wm dismiss-keyguard
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          curl -fsSL --retry 3 "$url/client-v4-github-cache/RUSSIA_v4.apk" -o old.apk
+          curl -fsSL --retry 3 "$url/client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58/RUSSIA_v5.apk" -o new.apk
+          adb install -g old.apk
+          adb install -r -g new.apk
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v5/smoke_ui.py" -o smoke_ui.py
+          python3 smoke_ui.py
