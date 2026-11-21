@@ -58,11 +58,26 @@ jobs:
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
           export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avds"
+          mkdir -p "$ANDROID_AVD_HOME"
           "$sdk/sdkmanager" "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64" >android-sdk.log
           echo no | "$sdk/avdmanager" create avd --force -n playtest -k "system-images;android-30;google_apis;x86_64" --device pixel_4
-          emulator -avd playtest -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 2304 -partition-size 7400 >emulator.log 2>&1 &
-          trap 'adb emu kill >/dev/null 2>&1 || true' EXIT
-          timeout 300 bash -c 'adb wait-for-device; until adb shell getprop sys.boot_completed | grep -q 1; do sleep 3; done'
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa
+          df -h "$RUNNER_TEMP"
+          emulator -list-avds
+          emulator -accel-check
+          adb start-server
+          emulator -avd playtest -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 2048 -partition-size 3072 >emulator.log 2>&1 &
+          emupid=$!
+          trap 'adb emu kill >/dev/null 2>&1 || true; tail -35 emulator.log' EXIT
+          ready=0
+          for attempt in $(seq 1 100); do
+            if ! kill -0 "$emupid" 2>/dev/null; then tail -70 emulator.log; exit 1; fi
+            if [[ "$(timeout 4 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
           adb shell wm dismiss-keyguard
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
