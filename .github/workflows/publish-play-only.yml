@@ -1,0 +1,81 @@
+name: Publish the Play-only client
+on:
+  push:
+    branches: [release/client-v5-play-only]
+    paths: ['android/v5.1/**', '.github/workflows/publish-play-only.yml']
+permissions:
+  contents: read
+concurrency:
+  group: russia-rp-play-only-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 10
+    env:
+      TAG: client-v5.1-play
+      SHA: f972693f64f5941a496ef00509075bcc6fa5375b7f4dee36fe120cff71c28ba6
+      CACHE_TAG: client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58
+    steps:
+      - name: Verify and publish the signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          name=RUSSIA_v5.1.apk
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v5.1"
+          curl -fsSL --retry 3 "$src/signed-v5.1.patch" -o client.patch
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/$CACHE_TAG/RUSSIA_v5.apk" -o "$name"
+          echo "aae8ff4b4e0a06ccd3e49baaf43ea9ccfbd55b54fc087ed644f7620961b08cb0  $name" | sha256sum -c
+          git apply --binary client.patch
+          echo "$SHA  $name" | sha256sum -c
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$CACHE_TAG" --jq '.assets[]|select(.name=="Rkkdev.zip")|.digest' | grep -Fx sha256:1cdd9c76725fdd1ab07f196a9e5fdcafd5c5808ba883f71701cfa5e0d33d77ea
+          cat > notes.md <<'NOTES'
+          Установите RUSSIA_v5.1.apk поверх v4 или v5 и откройте обычное меню. Только кнопка «Играть» открывает штатный экран с медведем. На нём идут проверка файлов, загрузка игрового кэша с GitHub и установка.
+          
+          При первой установке кэша потребуется около 5,6 ГБ свободного места. После обновления с v4 штатный загрузчик может один раз скачать 1,49 ГБ заново. Версия Android-клиента 1.6.3 (19).
+          NOTES
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" "$name" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "RUSSIA v5.1 — скачивание только по кнопке «Играть»" --notes-file notes.md --latest
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]|select(.name=="RUSSIA_v5.1.apk")|.digest' | grep -Fx "sha256:$SHA"
+  smoke:
+    name: Check the stock Play flow on Android 11
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    permissions:
+      contents: read
+    steps:
+      - name: Boot Android and exercise the installed release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          "$sdk/sdkmanager" "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64" >android-sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n playtest -k "system-images;android-30;google_apis;x86_64" --device pixel_4
+          emulator -avd playtest -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 2304 -partition-size 7400 >emulator.log 2>&1 &
+          trap 'adb emu kill >/dev/null 2>&1 || true' EXIT
+          timeout 300 bash -c 'adb wait-for-device; until adb shell getprop sys.boot_completed | grep -q 1; do sleep 3; done'
+          adb shell wm dismiss-keyguard
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          curl -fsSL --retry 3 "$url/client-v4-github-cache/RUSSIA_v4.apk" -o old.apk
+          curl -fsSL --retry 3 "$url/client-v5.1-play/RUSSIA_v5.1.apk" -o new.apk
+          adb install -g old.apk
+          adb install -r -g new.apk
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v5/smoke_ui.py" -o smoke_ui.py
+          if ! python3 smoke_ui.py; then
+            adb shell dumpsys activity activities | grep -m 1 -E 'mResumedActivity|topResumedActivity' || true
+            adb shell uiautomator dump /sdcard/visible.xml >/dev/null 2>&1 || true
+            adb exec-out cat /sdcard/visible.xml | python3 -c "import sys,xml.etree.ElementTree as e; n=e.parse(sys.stdin).findall('.//node'); print([(i.get('resource-id',''),i.get('text','')[:64]) for i in n if i.get('text') or i.get('resource-id')][:38])" || true
+            exit 1
+          fi
