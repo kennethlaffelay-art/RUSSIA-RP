@@ -12,12 +12,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {api: 36, image: google_apis_ps16k, arch: x86_64}
+          - {api: 36, image: google_apis_ps16k, arch: x86_64, pages: 16384}
+          - {api: 36, image: google_apis, arch: x86_64, pages: 4096}
     timeout-minutes: 32
     steps:
       - name: Run the 64-bit APK and collect application diagnostics
         shell: bash
         env:
+          EXPECTED_PAGES: ${{ matrix.pages }}
           API: ${{ matrix.api }}
           IMAGE: ${{ matrix.image }}
           ARCH: ${{ matrix.arch }}
@@ -60,7 +62,7 @@ jobs:
           test "$(timeout 8 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
           pages=$(adb shell getconf PAGE_SIZE | tr -d '\r')
           echo "Android test environment uses $pages-byte pages"
-          test "$pages" = 16384
+          test "$pages" = "$EXPECTED_PAGES"
           abi=$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')
           echo "Android $API reports $abi"
           [[ "$abi" == *arm64-v8a* ]]

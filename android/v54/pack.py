@@ -36,6 +36,6 @@ inputs=['classes8.dex','AndroidManifest.xml']
 unsigned=work/'unsigned.apk'
 shutil.copyfile(base,unsigned)
 subprocess.run(['zip','-qd',str(unsigned),*inputs],check=True)
-inputs.append('assets/russia-gui.dxt.toc')
+inputs.extend(['assets/russia-gui.dxt.toc', 'assets/russia-engine-paths.tsv'])
 for name in inputs:os.utime(work/name,(946684800,946684800))
 subprocess.run(['zip','-q','-0','-X',str(unsigned),*inputs],cwd=work,env=dict(os.environ,TZ='UTC'),check=True)

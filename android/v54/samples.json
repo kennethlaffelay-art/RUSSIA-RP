@@ -9,5 +9,6 @@
   "data/decision/allowed/Cop.ped": "d91e13fb6aaf0be786e32fd37a68cf0425cef9fbc23742222d31d1ff312a8150",
   "AUDIO/CONFIG/BANKSLOT.DAT": "aa7035f9c914cd3b73f9535b2794a10febeebfbcdb166d340d875093eab71e72",
   "AUDIO/SFX/GENRL.osw.idx": "f04d94dd5b7e2249fa9eb188321406f73cd7e34dd801aeda87e42999eda43253",
-  "texdb/gui/gui.dxt.toc": "86fc19ec07399d22834f42d93d0b7fcb9556e4c9aab9fe98f34502803f43b1e1"
+  "texdb/gui/gui.dxt.toc": "86fc19ec07399d22834f42d93d0b7fcb9556e4c9aab9fe98f34502803f43b1e1",
+  "DATA/ANIMGRP.DAT": "012b10d891840c48e0f282fdef7700673a12fe6c568a7ac9127c21095808aef8"
 }

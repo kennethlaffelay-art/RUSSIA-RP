@@ -114,6 +114,7 @@ public final class StockCache {
     }
     private void copyVerified(Entry entry, File source) throws IOException {
         Files.createDirectories(entry.file.getParentFile().toPath());
+        needSpace(entry.file.getParentFile(), entry.size);
         Path temp = Files.createTempFile(entry.file.getParentFile().toPath(), ".russia-install-", ".tmp");
         try {
             Files.copy(source.toPath(), temp, StandardCopyOption.REPLACE_EXISTING);
@@ -122,6 +123,22 @@ public final class StockCache {
             move(temp.toFile(), entry.file);
         } finally {
             Files.deleteIfExists(temp);
+        }
+    }
+    private void installEnginePaths(boolean fast) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                activity.getAssets().open("russia-engine-paths.tsv"), "UTF-8"))) {
+            for (String row; (row = reader.readLine()) != null;) {
+                cancelled();
+                String[] fields = row.split("\\t", -1);
+                if (fields.length != 4) throw new IOException("Повреждён список путей движка");
+                File source = target(fields[0]);
+                File destination = target(fields[1]);
+                long length = Long.parseLong(fields[2]);
+                long crc = Long.parseLong(fields[3]);
+                if (!valid(destination, length, crc, false, fast))
+                    copyVerified(new Entry(fields[1], destination, length, crc), source);
+            }
         }
     }
     private void installTextureList() throws IOException {
@@ -199,6 +216,7 @@ public final class StockCache {
                 }
             }
         }
+        installEnginePaths(fast);
         installTextureList();
         File guiTable = target("texdb/gui/gui.dxt.toc");
         if (!guiTable.isFile() || guiTable.length() == 0) {
