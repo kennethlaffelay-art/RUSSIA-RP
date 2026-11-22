@@ -1,0 +1,77 @@
+name: Isolate Android window rendering during ARM64 world-load check
+on:
+  push:
+    branches: [fix/arm64-startup]
+    paths: ['.github/workflows/verify-world-softwindow-v56.yml']
+permissions: {}
+jobs:
+  native:
+    env:
+      ANDROID_SERIAL: 127.0.0.1:15555
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {android: 12, image: 'redroid/redroid@sha256:3c7f9450188226bf8042c0159b9b38abe2106f1ceb0dfa45fae1cbc6409cd9bb'}
+    name: Android ${{ matrix.android }} on ARM64
+    steps:
+      - name: Boot Android on native ARM processors
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          test "$(uname -m)" = aarch64
+          sudo modprobe binder_linux devices=binder,hwbinder,vndbinder
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb tesseract-ocr-rus
+          docker run -d --name arm-android --platform linux/arm64 --privileged -p 127.0.0.1:15555:5555 -v android-data:/data "$IMAGE" androidboot.use_memfd=true androidboot.redroid_gpu_mode=guest androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320
+          adb start-server
+          for i in $(seq 1 60); do
+            adb connect 127.0.0.1:15555 > /dev/null 2>&1 || true
+            if [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
+            sleep 3
+          done
+          docker ps -a --filter name=arm-android
+          test "$(timeout 5 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          adb shell uname -m
+          adb shell getprop ro.dalvik.vm.native.bridge
+          test "$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')" = arm64-v8a
+      - name: Exercise the signed game libraries with a software-rendered Android window
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA"
+          dl="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          curl -fsSL --retry 3 "$src/qa/arm-hardware/observe.py" -o observe.py
+          curl -fsSL --retry 3 "$src/qa/v53-entry/full_check.py" -o full_check.py
+          curl -fsSL --retry 3 "$src/android/v54/fresh.py" -o fresh.py
+          curl -fsSL --retry 3 "$src/android/v56/qa/map_entry.py" -o map_entry.py
+          curl -fsSL --retry 3 "$src/qa/v56-native/software_window.py" -o software_window.py
+          curl -fsSL --retry 3 "$src/qa/v56-native/native_check.py" -o native_check.py
+          curl -fsSL --retry 3 "$dl/client-v5.6-arm64-world/RUSSIA_v5.6.apk" -o candidate.apk
+          curl -fsSL --retry 3 "$src/android/v56/SHA256SUMS" -o SHA256SUMS
+          sha256sum -c SHA256SUMS
+          python3 software_window.py candidate.apk test-window
+          # The ARM64 runner has Debian's Android packaging utilities.
+          sudo apt-get -qq install -y apksigner zipalign default-jre-headless
+          zipalign -f -p 4 test-window/unsigned.apk test-window/aligned.apk
+          keytool -genkeypair -keyalg RSA -keystore qa.p12 -storepass tempqa123 -alias ui -dname CN=Disposable-Test -validity 5 >/dev/null 2>&1
+          apksigner sign --ks qa.p12 --ks-pass pass:tempqa123 --out test-window/test.apk test-window/aligned.apk
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g --abi arm64-v8a test-window/test.apk
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          adb shell settings put secure immersive_mode_confirmations confirmed
+          curl -fsSL --retry 3 "$dl/client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58/Rkkdev.zip" -o cache.zip
+          python3 -u native_check.py
+      - name: Collect Android diagnostics
+        if: always()
+        run: |
+          docker logs --tail=18 arm-android 2>&1 || true
+          timeout 5 adb shell getprop init.svc.surfaceflinger || true
+          timeout 5 adb logcat -d -b crash | grep -E 'signal |Abort message|Cause:|#[0-9]+ pc|ABI:' | grep -viE 'passw|token|bearer|https?://' | tail -65 || true
+          timeout 8 adb logcat -d -s 'AXL:*' | grep -iE 'failed|init|texture|load|error|not found|models' | grep -viE 'passw|token|bearer|https?:|login|account|settings.ini' | tail -35 || true
+          docker rm -f arm-android >/dev/null 2>&1 || true
