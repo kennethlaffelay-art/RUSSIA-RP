@@ -106,6 +106,10 @@ public final class StockCache {
             return "data/decision/allowed/" + archivedPath.substring("data/Decision/Allowed/".length());
         if (archivedPath.startsWith("data/Decision/"))
             return "data/decision/" + archivedPath.substring("data/Decision/".length());
+        if (archivedPath.startsWith("audio/CONFIG/"))
+            return archivedPath.toUpperCase(Locale.ROOT);
+        if (archivedPath.startsWith("audio/"))
+            return "AUDIO/" + archivedPath.substring("audio/".length());
         return archivedPath;
     }
     private void copyVerified(Entry entry, File source) throws IOException {
@@ -196,6 +200,19 @@ public final class StockCache {
             }
         }
         installTextureList();
+        File guiTable = target("texdb/gui/gui.dxt.toc");
+        if (!guiTable.isFile() || guiTable.length() == 0) {
+            File guiData = target("texdb/gui/gui.dxt.dat");
+            if (valid(guiData, 26178482L, 470212590L, false, false)) {
+                Path temp = Files.createTempFile(guiTable.getParentFile().toPath(), ".gui-index-", ".tmp");
+                try (InputStream in = activity.getAssets().open("russia-gui.dxt.toc")) {
+                    Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
+                    move(temp.toFile(), guiTable);
+                } finally {
+                    Files.deleteIfExists(temp);
+                }
+            }
+        }
         if(!marker.isFile())Files.createFile(marker.toPath());
         Files.deleteIfExists(part.toPath());
         status("Файлы игры готовы",1,1);

@@ -6,5 +6,8 @@
   "texdb/gta3.img": "06eb4a21778b53d60149c1dda2554907c3d6a0cd182a2cfa1acb40ecf535d1e7",
   "loader/texdbs.cfg": "7aefb865ab4e8277ed42bcb256ff2f37ac5bb430918ead4660d8bb0c2dfe5245",
   "data/decision/PedEvent.txt": "c61a077262a419b15a14961341144a96795f45d49014deb6fa98aa0e180400be",
-  "data/decision/allowed/Cop.ped": "d91e13fb6aaf0be786e32fd37a68cf0425cef9fbc23742222d31d1ff312a8150"
+  "data/decision/allowed/Cop.ped": "d91e13fb6aaf0be786e32fd37a68cf0425cef9fbc23742222d31d1ff312a8150",
+  "AUDIO/CONFIG/BANKSLOT.DAT": "aa7035f9c914cd3b73f9535b2794a10febeebfbcdb166d340d875093eab71e72",
+  "AUDIO/SFX/GENRL.osw.idx": "f04d94dd5b7e2249fa9eb188321406f73cd7e34dd801aeda87e42999eda43253",
+  "texdb/gui/gui.dxt.toc": "86fc19ec07399d22834f42d93d0b7fcb9556e4c9aab9fe98f34502803f43b1e1"
 }
