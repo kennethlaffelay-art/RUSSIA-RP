@@ -135,6 +135,11 @@ public final class StockCache {
         if (name.equals("data/default.dat")) return 3498633815L;
         return -1;
     }
+    private static boolean canCheckSizeOnly(String archivedPath) {
+        return !archivedPath.startsWith("data/maps/")
+                && !archivedPath.startsWith("models/coll/")
+                && controlCRC(archivedPath) == -1;
+    }
     private void prepareMapList(String path, String name) throws IOException {
         File config = target(path);
         long originalCRC = name.equals("gta") ? 627678493L : 2115274958L;
@@ -156,7 +161,7 @@ public final class StockCache {
                 File destination = target(fields[1]);
                 long size = Long.parseLong(fields[2]);
                 long crc = Long.parseLong(fields[3]);
-                if (!valid(destination, size, crc, false, fast))
+                if (!valid(destination, size, crc, false, fast && canCheckSizeOnly(fields[0])))
                     copyVerified(new Entry(fields[1], destination, size, crc), target(fields[0]));
             }
         }
@@ -239,7 +244,7 @@ public final class StockCache {
                 if (archivedPath.equals("texdb/txd/txd.dxt.toc") && valid(f,2760,4041003183L,false,false)) continue;
                 long configuredCRC = controlCRC(archivedPath);
                 if (configuredCRC != -1 && valid(f, n, configuredCRC, false, false)) continue;
-                if(valid(f,n,crc,row[3].equals("1"),fast && !migrated))continue;
+                if(valid(f,n,crc,row[3].equals("1"),fast && !migrated && canCheckSizeOnly(archivedPath)))continue;
                 Entry entry = new Entry(archivedPath, f, n, crc);
                 if(migrated) {
                     File previousFile = target(archivedPath);
