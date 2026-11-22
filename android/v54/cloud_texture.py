@@ -1,6 +1,6 @@
 """Complete the originally transparent cloud texture's mip chain."""
 from pathlib import Path
-import hashlib
+import gzip
 import struct
 from zipfile import ZipFile
 
@@ -29,4 +29,7 @@ if __name__=='__main__':
     import sys
     with ZipFile(sys.argv[1]) as archive: data,toc=corrected(archive)
     dest=Path(sys.argv[2]);dest.mkdir(parents=True,exist_ok=True)
-    (dest/'txd.dxt.dat').write_bytes(data);(dest/'txd.dxt.toc').write_bytes(toc)
+    pos=11990046
+    length=struct.unpack_from('<I',data,pos+8)[0]
+    (dest/'russia-cloud-record.gz').write_bytes(gzip.compress(data[pos+8:pos+12+length],mtime=0))
+    (dest/'russia-cloud-index').write_bytes(toc)

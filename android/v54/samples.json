@@ -14,5 +14,7 @@
   "TEXDB/GTA3.IMG": "06eb4a21778b53d60149c1dda2554907c3d6a0cd182a2cfa1acb40ecf535d1e7",
   "texdb/txd/txd.dxt.dat": "b0826d13ca5b8bf4ca2379e823a861ae2a940a86f4f3c335948ad7cbee0e2e68",
   "texdb/txd/txd.dxt.toc": "beb70af0a71171c42c6569aaedc3c6803100eea3e6a7680427122aad113f2317",
-  "SAMP/gta.dat": "69cfe704acfa98244764fe96ef4dc0a0bb204a5453d5f4d0c4b80d74e252bdda"
+  "SAMP/gta.dat": "69cfe704acfa98244764fe96ef4dc0a0bb204a5453d5f4d0c4b80d74e252bdda",
+  "DATA/DEFAULT.DAT": "647716235c71db1fb4d546d8ab2c7303e22267b3664a853cb4344d94cea7c8a1",
+  "DATA/GTA.DAT": "69cfe704acfa98244764fe96ef4dc0a0bb204a5453d5f4d0c4b80d74e252bdda"
 }
