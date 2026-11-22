@@ -1,0 +1,95 @@
+name: Check v5.3 texture startup and cache recovery
+on:
+  push:
+    branches: [release/v53-texture-startup]
+    paths: ['android/v53/**', '.github/workflows/check-v53.yml']
+permissions:
+  contents: read
+jobs:
+  entry:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [fresh64, fresh32, resume]
+    env:
+      SCENARIO: ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    steps:
+      - name: Test a fresh Android installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avds"
+          mkdir -p "$ANDROID_AVD_HOME"
+          "$sdk/sdkmanager" "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64" >android-sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n playtest -k "system-images;android-30;google_apis;x86_64" --device pixel_4
+          sed -i '/^disk.dataPartition.size=/d' "$ANDROID_AVD_HOME/playtest.avd/config.ini"
+          echo 'disk.dataPartition.size=14000M' >>"$ANDROID_AVD_HOME/playtest.avd/config.ini"
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa tesseract-ocr tesseract-ocr-rus
+          df -h "$RUNNER_TEMP"
+          emulator -list-avds
+          emulator -accel-check
+          adb start-server
+          emulator -avd playtest -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 4096 -partition-size 14000 >emulator.log 2>&1 &
+          emupid=$!
+          trap 'adb emu kill >/dev/null 2>&1 || true; tail -35 emulator.log' EXIT
+          ready=0
+          for attempt in $(seq 1 100); do
+            if ! kill -0 "$emupid" 2>/dev/null; then tail -70 emulator.log; exit 1; fi
+            if [[ "$(timeout 4 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
+          adb shell wm dismiss-keyguard
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell df -k /data
+          avail=$(adb shell df -k /data | awk 'NR==2 {print $4}')
+          test "$avail" -gt 6500000
+          adb shell getprop ro.product.cpu.abilist
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v53"
+          for file in full_check.py samples.json client.patch; do
+            curl -fsSL --retry 3 "$src/$file" -o "$file"
+          done
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.2-cache-recovery/RUSSIA_v5.2.apk" -o base.apk
+          echo '218ead3333e5caaff5d9abd5756b704e27f11eae451ac516c4d0a57c7719c0a1  base.apk' | sha256sum -c
+          cp base.apk RUSSIA_v5.3.apk
+          git apply --binary client.patch
+          echo 'a8d8398b5db0589975917427ddd6ac4eff6bbfac867dddccd2c3d235d902067b  RUSSIA_v5.3.apk' | sha256sum -c
+          abi=arm64-v8a
+          if [[ "$SCENARIO" == fresh32 ]]; then abi=armeabi-v7a; fi
+          echo "Testing game ABI $abi"
+          adb install -g --abi "$abi" base.apk
+          adb install -r -g --abi "$abi" RUSSIA_v5.3.apk
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          if ! python3 -u full_check.py; then
+            adb logcat -d -b crash | grep -E 'FATAL EXCEPTION|signal [0-9]+|Caused by: |#[0-9]+ pc|Abort message:|Exception:|Error:' | tail -55 || true
+            adb logcat -d -s RussiaCache:I | tail -12 || true
+            adb logcat -d | grep -Ei 'dlopen failed|UnsatisfiedLinkError|unimplemented OpenGL|failed to load|cannot load|could not open|cannot open|missing texture' | grep -viE 'keystore|chromium|systemui|provider|apex|com.google|vulkan|android.hardware' | tail -30 || true
+            adb logcat -d -v brief -s AXL | grep -Ei 'Load(ing)? |Texture|Database|initializ|error|not found|GTA.*0x|BACKTRACE' | grep -viE 'passw|token|https?:|account|nickname' | tail -130 || true
+            adb exec-out cat /sdcard/Weik/SAMP/samp_log.txt > new-game.log 2>/dev/null || true
+            adb exec-out cat /sdcard/Weik/SAMP/crash_log.log > new-crash.log 2>/dev/null || true
+            ls -l new-game.log new-crash.log
+            adb logcat -d -v brief > emulator-session.log
+            python3 - <<'PYLOG'
+          import pathlib,re
+          for name in ('new-game.log','new-crash.log','emulator-session.log'):
+              raw=pathlib.Path(name).read_bytes().decode('utf-8','replace')
+              rows=[]
+              for line in raw.splitlines():
+                  if re.search(r'login|password|nickname|\bchat\b|server address|token|Bearer|Account',line,re.I): continue
+                  if re.search(r'(load(ing|ed)? (?:gta|base|lib|game|text|gui|settings|font|script|peds|handling|vehicle)|database not found|texture .{0,80}not found|file not found|libGame.so address|libmultiplayer.so address|initializ(?:e|ing) (?:game|client)|NVEvent|RwEngine|file system|failed to create (?:surface|context)|CFileMgr|GTASA|samp:|gta:|Backtrace:|libGame\.so\s*\+|libmultiplayer\.so\s*\+|SIGSEGV)',line,re.I):
+                      rows.append(re.sub(r'/data/app/[^ ]{15,}?(?=/lib|/base\.apk)','<APK>', line).strip()[:300])
+              print(name,*rows[-65:],sep='\n')
+          PYLOG
+            adb shell df -k /data
+            adb shell dumpsys activity activities | grep -m 1 -E 'mResumedActivity|topResumedActivity' || true
+            adb logcat -d -b crash | grep -E 'signal [0-9]+ \(SIG[A-Z]+\)|FATAL EXCEPTION|>>> com.wn.blackrussia <<<' | tail -10 || true
+            exit 1
+          fi
