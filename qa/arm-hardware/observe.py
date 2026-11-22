@@ -42,6 +42,9 @@ def main():
         # Dismiss only Android's compatibility notice or grant its standard notification prompt.
         dialog=next((n for n in items if n.get('resource-id')=='android:id/button1' and n.get('text','').lower() in ('ok','ок')),None)
         notification=next((n for n in items if n.get('resource-id','').endswith(':id/permission_allow_button')),None)
+        immersive=next((n for n in items if n.get('resource-id')=='android:id/ok'),None)
+        if immersive is not None and any(n.get('resource-id')=='android:id/immersive_cling_title' for n in items):
+            ui.tap(immersive);continue
         if dialog is not None:ui.tap(dialog);continue
         if notification is not None:ui.tap(notification);continue
         button=ui.resource(items,'playButton')
@@ -68,7 +71,12 @@ def main():
         if ui.crash():log('PROCESS_CRASH',report=ui.crash());break
         if opened and screen=='game' and time.monotonic()-started>120:break
         time.sleep(3)
-    deaths=shell('dumpsys','activity','exit-info',PKG)
+    known.update(ui.runtime_labels())
+    for name in ('/sdcard/Weik/SAMP/crash_log.log','/sdcard/Weik/reBRClientLog.txt'):
+        record=subprocess.run(['adb','exec-out','tail','-c','131072',name],capture_output=True,timeout=10).stdout.decode('utf8','replace')
+        # Report only native game frame identifiers generated in this CI session.
+        frames=re.findall(r'lib(?:Game|multiplayer|GTASA|samp)\.so\s*\+\s*(?:0x)?[0-9a-fA-F]+',record)
+        if frames:log('NATIVE_GAME_FRAMES',frames=frames[-20:])
     log('RESULT',game_opened=opened,final_screen=state(),observed_s=round(time.monotonic()-started),labels=sorted(known),new_crash=bool(ui.crash()))
     if ui.crash() or state()!='game':raise RuntimeError('64-bit game did not stay open')
 

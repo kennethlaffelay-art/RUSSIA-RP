@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [fix/arm64-startup]
-    paths: ['.github/workflows/arm64-android16.yml']
+    paths: ['.github/workflows/arm64-android16.yml', 'qa/arm-hardware/observe.py']
 permissions: {}
 jobs:
   native:
@@ -70,7 +70,6 @@ jobs:
           timeout 8 adb logcat -d -s 'AXL:*' | grep -iE 'failed|init|texture|load|error|not found|models' | grep -viE 'passw|token|bearer|https?:|login|account|settings.ini' | tail -35 || true
           docker rm -f arm-android >/dev/null 2>&1 || true
   sdk:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
