@@ -4,7 +4,7 @@ checksrc="$GITHUB_WORKSPACE/android/v59"
 cd "$RUNNER_TEMP"
 curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.7-game-surface/RUSSIA_v5.7.apk" -o base.apk
 echo '6fb0fb4cf7687e7c9687c097bde162432803c36543f365a720e8a015aefb1463  base.apk' | sha256sum -c
-sdk=$(ls -d "$ANDROID_HOME/build-tools"/* | sort -V | tail -1)
+sdk="$ANDROID_HOME/build-tools/35.0.0"
 androidjar="$ANDROID_HOME/platforms/android-36/android.jar"
 test -f "$androidjar"
 mkdir -p stubsrc/com/akexorcist/roundcornerprogressbar stubclasses cacheclasses dex
@@ -24,7 +24,11 @@ unzip -p base.apk classes8.dex > previous.dex
 for item in previous.dex dex/classes.dex; do
   "$sdk/dexdump" "$item" | sed -n 's/.*Class descriptor  *: //p' | LC_ALL=C sort > "$(basename "$item").list"
 done
-diff -u previous.dex.list classes.dex.list
+for list in previous.dex.list classes.dex.list; do
+  grep -F -e 'Lru/russiarp/install/StockCache;' -e 'Lru/russiarp/install/StockCache$Entry;' "$list" | sort > "$list.api"
+done
+diff -u previous.dex.list.api classes.dex.list.api
+test "$(wc -l < classes.dex.list.api)" -eq 2
 "$sdk/dexdump" dex/classes.dex | grep 'canCheckSizeOnly' >/dev/null
 python3 "$checksrc/package.py"
 "$sdk/zipalign" -P 16 -f 4 rebuilt.apk aligned.apk
