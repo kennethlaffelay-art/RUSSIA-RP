@@ -16,6 +16,8 @@ def normalize(token,index):
     path=token.replace(b'\\',b'/')
     real=index.get(path.lower())
     if not real or real.startswith((b'audio/',b'data/Decision/')):return token
+    if real.startswith(b'texdb/') and real.lower().endswith(b'.img'):
+        real=real.upper()
     return bytes(c if c in (47,92) else v for c,v in zip(token,real,strict=True))
 
 def library(src,index):
@@ -27,7 +29,7 @@ def library(src,index):
     named={src[names[4]+s[0]:].split(b'\0',1)[0]:s for s in sections}
     ro=named[b'.rodata']
     out=bytearray(src);start=ro[4];stop=start+ro[5]
-    for match in re.finditer(rb'(?:data|anim|models|texdb)[\\/][A-Za-z0-9_.\\/-]+(?=\0)',src[start:stop],re.I):
+    for match in re.finditer(rb'(?:data|anim|models|texdb|samp)[\\/][A-Za-z0-9_.\\/-]+(?=\0)',src[start:stop],re.I):
         key=match[0];fixed=normalize(key,index)
         if fixed!=key:
             i=start+match.start()
@@ -53,11 +55,6 @@ if __name__=='__main__':
     out=Path(opts.output)
     with ZipFile(opts.apk) as apk,ZipFile(opts.cache) as archive:
         index=file_index(archive)
-        for abi in ('arm64-v8a','armeabi-v7a'):
-            for lib in ('libGame.so','libmultiplayer.so'):
-                path='lib/'+abi+'/'+lib
-                (out/path).parent.mkdir(parents=True,exist_ok=True)
-                (out/path).write_bytes(library(apk.read(path),index))
         (out/'assets').mkdir(parents=True,exist_ok=True)
         for config in ('gta','default'):
             raw=archive.read('Rkkdev/data/'+config+'.dat')

@@ -3,7 +3,6 @@
   "data/timecyc.dat": "0efce1a3d36aac22bf5276f65f7a8aa411ce34bdcbe5128cef4c800f82d5754b",
   "data/script/script.img": "99053a8ebc73015ca554f20e74f46b910a356049c2ec624afbcae8607add211d",
   "data/vehicles.ide": "b845b101783aa5c52031ad4a3b2a57539505a33d2242af24f08e406c56540c06",
-  "texdb/gta3.img": "06eb4a21778b53d60149c1dda2554907c3d6a0cd182a2cfa1acb40ecf535d1e7",
   "loader/texdbs.cfg": "7aefb865ab4e8277ed42bcb256ff2f37ac5bb430918ead4660d8bb0c2dfe5245",
   "data/decision/PedEvent.txt": "c61a077262a419b15a14961341144a96795f45d49014deb6fa98aa0e180400be",
   "data/decision/allowed/Cop.ped": "d91e13fb6aaf0be786e32fd37a68cf0425cef9fbc23742222d31d1ff312a8150",
@@ -11,5 +10,9 @@
   "AUDIO/SFX/GENRL.osw.idx": "f04d94dd5b7e2249fa9eb188321406f73cd7e34dd801aeda87e42999eda43253",
   "texdb/gui/gui.dxt.toc": "86fc19ec07399d22834f42d93d0b7fcb9556e4c9aab9fe98f34502803f43b1e1",
   "data/animgrp.dat": "012b10d891840c48e0f282fdef7700673a12fe6c568a7ac9127c21095808aef8",
-  "data/default.dat": "647716235c71db1fb4d546d8ab2c7303e22267b3664a853cb4344d94cea7c8a1"
+  "data/default.dat": "647716235c71db1fb4d546d8ab2c7303e22267b3664a853cb4344d94cea7c8a1",
+  "TEXDB/GTA3.IMG": "06eb4a21778b53d60149c1dda2554907c3d6a0cd182a2cfa1acb40ecf535d1e7",
+  "texdb/txd/txd.dxt.dat": "b0826d13ca5b8bf4ca2379e823a861ae2a940a86f4f3c335948ad7cbee0e2e68",
+  "texdb/txd/txd.dxt.toc": "beb70af0a71171c42c6569aaedc3c6803100eea3e6a7680427122aad113f2317",
+  "SAMP/gta.dat": "69cfe704acfa98244764fe96ef4dc0a0bb204a5453d5f4d0c4b80d74e252bdda"
 }

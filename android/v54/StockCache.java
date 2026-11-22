@@ -107,6 +107,8 @@ public final class StockCache {
             return "data/decision/allowed/" + archivedPath.substring("data/Decision/Allowed/".length());
         if (archivedPath.startsWith("data/Decision/"))
             return "data/decision/" + archivedPath.substring("data/Decision/".length());
+        if (archivedPath.startsWith("texdb/") && archivedPath.endsWith(".img"))
+            return archivedPath.toUpperCase(Locale.ROOT);
         if (archivedPath.startsWith("audio/CONFIG/"))
             return archivedPath.toUpperCase(Locale.ROOT);
         if (archivedPath.startsWith("audio/"))
@@ -129,12 +131,12 @@ public final class StockCache {
         }
     }
     private static long controlCRC(String name) {
-        if (name.equals("data/gta.dat")) return 235165133L;
+        if (name.equals("data/gta.dat") || name.equals("SAMP/gta.dat")) return 235165133L;
         if (name.equals("data/default.dat")) return 3498633815L;
         return -1;
     }
-    private void prepareMapList(String name) throws IOException {
-        File config = target("data/" + name + ".dat");
+    private void prepareMapList(String path, String name) throws IOException {
+        File config = target(path);
         long originalCRC = name.equals("gta") ? 627678493L : 2115274958L;
         if (!valid(config, config.length(), originalCRC, false, false)) return;
         Path stage = Files.createTempFile(config.getParentFile().toPath(), ".russia-map-", ".tmp");
@@ -143,6 +145,58 @@ public final class StockCache {
             move(stage.toFile(), config);
         } finally {
             Files.deleteIfExists(stage);
+        }
+    }
+    private void installEnginePaths(boolean fast) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                activity.getAssets().open("russia-engine-paths.tsv"), "UTF-8"))) {
+            for (String row; (row = reader.readLine()) != null;) {
+                String[] fields = row.split("\\t", -1);
+                if (fields.length != 4) throw new IOException("Повреждён список путей движка");
+                File destination = target(fields[1]);
+                long size = Long.parseLong(fields[2]);
+                long crc = Long.parseLong(fields[3]);
+                if (!valid(destination, size, crc, false, fast))
+                    copyVerified(new Entry(fields[1], destination, size, crc), target(fields[0]));
+            }
+        }
+    }
+    private void copyBytes(InputStream in, OutputStream out, long bytes) throws IOException {
+        while (bytes > 0) {
+            cancelled();
+            int count = in.read(buffer, 0, (int) Math.min(buffer.length, bytes));
+            if (count < 0) throw new EOFException("Неполная база текстур");
+            if (out != null) out.write(buffer, 0, count);
+            bytes -= count;
+        }
+    }
+    private void prepareCloudTexture() throws IOException {
+        File data = target("texdb/txd/txd.dxt.dat");
+        File index = target("texdb/txd/txd.dxt.toc");
+        if (data.length() == 36256714L && valid(data, 36256714L, 2414866815L, false, false)) {
+            needSpace(data.getParentFile(), 36604194L);
+            Path temp = Files.createTempFile(data.getParentFile().toPath(), ".txd-", ".tmp");
+            try {
+                try (InputStream in = new FileInputStream(data); OutputStream out = Files.newOutputStream(temp);
+                     InputStream record = new GZIPInputStream(activity.getAssets().open("russia-cloud-record.gz"))) {
+                    copyBytes(in, out, 11990046L + 8);
+                    copyBytes(in, null, 4 + 2056);
+                    copyBytes(record, out, 349540);
+                    copyBytes(in, out, 36256714L - 11990046L - 12 - 2056);
+                }
+                if (!valid(temp.toFile(), 36604194L, 1177694875L, false, false))
+                    throw new IOException("Не удалось проверить базу текстур");
+                move(temp.toFile(), data);
+            } finally { Files.deleteIfExists(temp); }
+        }
+        if (data.length() == 36604194L && valid(index, 2760, 2582281193L, false, false)) {
+            Path temp = Files.createTempFile(index.getParentFile().toPath(), ".txd-index-", ".tmp");
+            try (InputStream in = activity.getAssets().open("russia-cloud-index")) {
+                Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
+                if (!valid(temp.toFile(), 2760, 4041003183L, false, false))
+                    throw new IOException("Не удалось проверить индекс текстур");
+                move(temp.toFile(), index);
+            } finally { Files.deleteIfExists(temp); }
         }
     }
     private void installTextureList() throws IOException {
@@ -181,6 +235,8 @@ public final class StockCache {
                 File pending=new File(f.getParentFile(),".russia-v52-"+f.getName()+".part");
                 Files.deleteIfExists(pending.toPath());
                 boolean migrated=!gamePath.equals(archivedPath);
+                if (archivedPath.equals("texdb/txd/txd.dxt.dat") && valid(f,36604194L,1177694875L,false,fast)) continue;
+                if (archivedPath.equals("texdb/txd/txd.dxt.toc") && valid(f,2760,4041003183L,false,false)) continue;
                 long configuredCRC = controlCRC(archivedPath);
                 if (configuredCRC != -1 && valid(f, n, configuredCRC, false, false)) continue;
                 if(valid(f,n,crc,row[3].equals("1"),fast && !migrated))continue;
@@ -188,7 +244,12 @@ public final class StockCache {
                 if(migrated) {
                     File previousFile = target(archivedPath);
                     if(valid(previousFile,n,crc,false,false)) {
-                        copyVerified(entry, previousFile);
+                        if (archivedPath.startsWith("texdb/") && archivedPath.endsWith(".img")) {
+                            Files.createDirectories(f.getParentFile().toPath());
+                            move(previousFile, f);
+                        } else {
+                            copyVerified(entry, previousFile);
+                        }
                         continue;
                     }
                 }
@@ -222,8 +283,11 @@ public final class StockCache {
                 }
             }
         }
-        prepareMapList("gta");
-        prepareMapList("default");
+        prepareMapList("data/gta.dat", "gta");
+        prepareMapList("SAMP/gta.dat", "gta");
+        prepareMapList("data/default.dat", "default");
+        installEnginePaths(fast);
+        prepareCloudTexture();
         installTextureList();
         File guiTable = target("texdb/gui/gui.dxt.toc");
         if (!guiTable.isFile() || guiTable.length() == 0) {

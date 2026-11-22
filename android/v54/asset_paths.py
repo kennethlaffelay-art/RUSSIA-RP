@@ -12,14 +12,10 @@ def manifest(apk,cache):
             raw=apk.read(f'lib/{abi}/{lib}')
             for match in re.finditer(rb'[ -~]{4,}', raw):
                 refs.add(match.group().decode('ascii').replace('\\','/').removeprefix('%s').lstrip('/'))
-    for cfg in ('data/gta.dat','data/default.dat'):
-        for line in cache.read('Rkkdev/'+cfg).decode('cp1251').splitlines():
-            parts=line.partition('#')[0].split()
-            if len(parts)>=2:refs.add(parts[-1].replace('\\','/'))
     result=[]
     for requested in sorted(refs):
         original=files.get(requested.lower())
-        if original and requested!=original and original.startswith(('data/','models/','anim/')):
+        if original and requested!=original and original.startswith(('data/','models/','anim/')) and original.lower() not in ('data/gta.dat','data/default.dat'):
             result.append((original,requested))
     return result
 if __name__=='__main__':

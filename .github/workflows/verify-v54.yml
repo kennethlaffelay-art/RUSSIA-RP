@@ -14,6 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - {android: 12, image: 'redroid/redroid@sha256:3c7f9450188226bf8042c0159b9b38abe2106f1ceb0dfa45fae1cbc6409cd9bb'}
           - {android: 15, image: 'redroid/redroid@sha256:dc2024a999dd0acb1112a23cddc9537ec8cb60a0dbe5a87ce9fbd75a2f5e94d2'}
     name: Android ${{ matrix.android }} on ARM64
     steps:
