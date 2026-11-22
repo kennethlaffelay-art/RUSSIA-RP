@@ -41,9 +41,7 @@ jobs:
           echo 'disk.dataPartition.size=10000M' >>"$ANDROID_AVD_HOME/native.avd/config.ini"
           export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
           export ANDROID_I_WANT_MY_TCG=yes
-          accel=off
-          if emulator -accel-check 2>&1 | grep -qi 'installed and usable\|is working\|operational'; then accel=auto; fi
-          emulator -avd native -accel "$accel" -no-window -no-boot-anim -no-audio -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 2304 >arm-emulator.log 2>&1 &
+          emulator -avd native -accel off -no-window -no-boot-anim -no-audio -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 2304 -qemu -accel tcg,thread=multi >arm-emulator.log 2>&1 &
           emupid=$!
           trap 'tail -35 arm-emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
           adb start-server
