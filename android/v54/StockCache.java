@@ -128,20 +128,21 @@ public final class StockCache {
             Files.deleteIfExists(temp);
         }
     }
-    private void installEnginePaths(boolean fast) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                activity.getAssets().open("russia-engine-paths.tsv"), "UTF-8"))) {
-            for (String row; (row = reader.readLine()) != null;) {
-                cancelled();
-                String[] fields = row.split("\\t", -1);
-                if (fields.length != 4) throw new IOException("Повреждён список путей движка");
-                File source = target(fields[0]);
-                File destination = target(fields[1]);
-                long length = Long.parseLong(fields[2]);
-                long crc = Long.parseLong(fields[3]);
-                if (!valid(destination, length, crc, false, fast))
-                    copyVerified(new Entry(fields[1], destination, length, crc), source);
-            }
+    private static long controlCRC(String name) {
+        if (name.equals("data/gta.dat")) return 235165133L;
+        if (name.equals("data/default.dat")) return 3498633815L;
+        return -1;
+    }
+    private void prepareMapList(String name) throws IOException {
+        File config = target("data/" + name + ".dat");
+        long originalCRC = name.equals("gta") ? 627678493L : 2115274958L;
+        if (!valid(config, config.length(), originalCRC, false, false)) return;
+        Path stage = Files.createTempFile(config.getParentFile().toPath(), ".russia-map-", ".tmp");
+        try (InputStream in = activity.getAssets().open("russia-" + name + ".dat")) {
+            Files.copy(in, stage, StandardCopyOption.REPLACE_EXISTING);
+            move(stage.toFile(), config);
+        } finally {
+            Files.deleteIfExists(stage);
         }
     }
     private void installTextureList() throws IOException {
@@ -180,6 +181,8 @@ public final class StockCache {
                 File pending=new File(f.getParentFile(),".russia-v52-"+f.getName()+".part");
                 Files.deleteIfExists(pending.toPath());
                 boolean migrated=!gamePath.equals(archivedPath);
+                long configuredCRC = controlCRC(archivedPath);
+                if (configuredCRC != -1 && valid(f, n, configuredCRC, false, false)) continue;
                 if(valid(f,n,crc,row[3].equals("1"),fast && !migrated))continue;
                 Entry entry = new Entry(archivedPath, f, n, crc);
                 if(migrated) {
@@ -219,7 +222,8 @@ public final class StockCache {
                 }
             }
         }
-        installEnginePaths(fast);
+        prepareMapList("gta");
+        prepareMapList("default");
         installTextureList();
         File guiTable = target("texdb/gui/gui.dxt.toc");
         if (!guiTable.isFile() || guiTable.length() == 0) {

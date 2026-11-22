@@ -33,9 +33,11 @@ while pos<len(data):
 assert updated==1
 (work/'AndroidManifest.xml').write_bytes(data)
 inputs=['classes8.dex','AndroidManifest.xml']
+for abi in ('arm64-v8a','armeabi-v7a'):
+    inputs.extend('lib/'+abi+'/'+name for name in ('libGame.so','libmultiplayer.so'))
 unsigned=work/'unsigned.apk'
 shutil.copyfile(base,unsigned)
 subprocess.run(['zip','-qd',str(unsigned),*inputs],check=True)
-inputs.extend(['assets/russia-gui.dxt.toc', 'assets/russia-engine-paths.tsv'])
+inputs.extend(['assets/russia-gui.dxt.toc', 'assets/russia-gta.dat', 'assets/russia-default.dat'])
 for name in inputs:os.utime(work/name,(946684800,946684800))
 subprocess.run(['zip','-q','-0','-X',str(unsigned),*inputs],cwd=work,env=dict(os.environ,TZ='UTC'),check=True)

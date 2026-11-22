@@ -1,5 +1,5 @@
 {
-  "data/gta.dat": "752166561aafcff8c23715bcaed4cd3975e9d0b9515b6133d3c8f291c1a2bbe4",
+  "data/gta.dat": "69cfe704acfa98244764fe96ef4dc0a0bb204a5453d5f4d0c4b80d74e252bdda",
   "data/timecyc.dat": "0efce1a3d36aac22bf5276f65f7a8aa411ce34bdcbe5128cef4c800f82d5754b",
   "data/script/script.img": "99053a8ebc73015ca554f20e74f46b910a356049c2ec624afbcae8607add211d",
   "data/vehicles.ide": "b845b101783aa5c52031ad4a3b2a57539505a33d2242af24f08e406c56540c06",
@@ -10,5 +10,6 @@
   "AUDIO/CONFIG/BANKSLOT.DAT": "aa7035f9c914cd3b73f9535b2794a10febeebfbcdb166d340d875093eab71e72",
   "AUDIO/SFX/GENRL.osw.idx": "f04d94dd5b7e2249fa9eb188321406f73cd7e34dd801aeda87e42999eda43253",
   "texdb/gui/gui.dxt.toc": "86fc19ec07399d22834f42d93d0b7fcb9556e4c9aab9fe98f34502803f43b1e1",
-  "DATA/ANIMGRP.DAT": "012b10d891840c48e0f282fdef7700673a12fe6c568a7ac9127c21095808aef8"
+  "data/animgrp.dat": "012b10d891840c48e0f282fdef7700673a12fe6c568a7ac9127c21095808aef8",
+  "data/default.dat": "647716235c71db1fb4d546d8ab2c7303e22267b3664a853cb4344d94cea7c8a1"
 }
