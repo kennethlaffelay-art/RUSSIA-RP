@@ -1,0 +1,68 @@
+name: Verify normal engine startup on native ARM64
+on:
+  push:
+    branches: [fix/v510-game-entry]
+    paths: ['.github/workflows/arm-entry-v510.yml','android/v510/arm_entry.py']
+permissions:
+  actions: read
+  contents: read
+jobs:
+  native:
+    env:
+      ANDROID_SERIAL: 127.0.0.1:15555
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 22
+    strategy:
+      matrix:
+        include:
+          - {android: 15, image: 'redroid/redroid@sha256:dc2024a999dd0acb1112a23cddc9537ec8cb60a0dbe5a87ce9fbd75a2f5e94d2'}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /android/v510/arm_entry.py
+            /android/v54/fresh.py
+            /qa/v53-entry/full_check.py
+      - name: Boot Android on native ARM processors
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          test "$(uname -m)" = aarch64
+          sudo modprobe binder_linux devices=binder,hwbinder,vndbinder
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          docker run -d --name arm-android --platform linux/arm64 --privileged -p 127.0.0.1:15555:5555 -v android-data:/data "$IMAGE" androidboot.use_memfd=true androidboot.redroid_gpu_mode=guest androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320
+          adb start-server
+          for i in $(seq 1 60); do
+            adb connect 127.0.0.1:15555 > /dev/null 2>&1 || true
+            if [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
+            sleep 3
+          done
+          docker ps -a --filter name=arm-android
+          test "$(timeout 5 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          adb shell uname -m
+          adb shell getprop ro.dalvik.vm.native.bridge
+          test "$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')" = arm64-v8a
+      - name: Exercise stock Play and identify the last engine startup stage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          gh run download 45078233536 --repo "$GITHUB_REPOSITORY" --name generic-client-template -D .
+          keytool -genkeypair -keyalg RSA -keystore qa.p12 -storepass fixture123 -alias emulator -dname CN=Fixture -validity 2 >/dev/null 2>&1
+          java -jar apksigner.jar sign --ks qa.p12 --ks-pass pass:fixture123 --out arm-fixture.apk client-template.apk
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g --abi arm64-v8a arm-fixture.apk
+          adb shell appops set com.wn.russiarpfix MANAGE_EXTERNAL_STORAGE allow
+          adb shell settings put secure immersive_mode_confirmations confirmed
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58/Rkkdev.zip" -o cache.zip
+          echo '1cdd9c76725fdd1ab07f196a9e5fdcafd5c5808ba883f71701cfa5e0d33d77ea  cache.zip' | sha256sum -c
+          sed -e "s/^PKG='com.wn.blackrussia'/PKG='com.wn.russiarpfix'/" -e 's@/Android/data/com.wn.blackrussia/@/Android/data/com.wn.russiarpfix/@g' "$GITHUB_WORKSPACE/qa/v53-entry/full_check.py" > full_check.py
+          cp "$GITHUB_WORKSPACE/android/v54/fresh.py" .
+          PYTHONPATH="$RUNNER_TEMP" python3 -u "$GITHUB_WORKSPACE/android/v510/arm_entry.py"
