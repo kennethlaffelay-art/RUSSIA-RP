@@ -1,0 +1,33 @@
+name: Check stock Play and world entry against a loopback game fixture
+on:
+  push:
+    branches: [fix/v510-game-entry]
+    paths: ['.github/workflows/entry-v510.yml','android/v510/test_host.sh','android/v510/qa.sh','android/v510/entry.py']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  android16:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /android/v510/
+            /android/v54/fresh.py
+            /qa/v53-entry/full_check.py
+      - name: Sign the local-fixture variant for the disposable emulator
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          gh run download 45078233536 --repo "$GITHUB_REPOSITORY" --name generic-client-template -D .
+          keytool -genkeypair -keyalg RSA -keystore qa.p12 -storepass fixture123 -alias emulator -dname CN=Fixture -validity 2 >/dev/null 2>&1
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks qa.p12 --ks-pass pass:fixture123 --out fixture.apk client-template.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify fixture.apk
+      - name: Exercise the normal Play button and observe the game
+        run: bash android/v510/qa.sh
