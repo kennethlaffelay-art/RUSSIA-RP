@@ -1,0 +1,64 @@
+name: Check the published v5.3 APK on an ARM64 Android system
+on:
+  push:
+    branches: [release/v53-texture-startup]
+    paths: ['.github/workflows/arm-v53.yml']
+permissions:
+  contents: read
+jobs:
+  arm:
+    runs-on: macos-15
+    timeout-minutes: 28
+    steps:
+      - name: Start the official ARM64 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          test "$(uname -m)" = arm64
+          export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/arm-avd"
+          mkdir -p "$ANDROID_AVD_HOME" "$ANDROID_HOME"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          if [[ ! -x "$sdk/sdkmanager" ]]; then
+            curl -fsSL --retry 2 https://dl.google.com/android/repository/repository2-3.xml -o repository.xml
+            url=$(python3 - <<'PY'
+          import xml.etree.ElementTree as E
+          root=E.parse('repository.xml')
+          p=next(p for p in root.iter('remotePackage') if p.get('path')=='cmdline-tools;latest')
+          print(next(a.findtext('complete/url') for a in p.findall('archives/archive') if a.findtext('host-os')=='macosx'))
+          PY
+            )
+            curl -fsSL --retry 2 "https://dl.google.com/android/repository/$url" -o sdk.zip
+            unzip -q sdk.zip -d android-tools
+            mkdir -p "$ANDROID_HOME/cmdline-tools"
+            mv android-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+          fi
+          (yes | "$sdk/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses >/dev/null) || true
+          "$sdk/sdkmanager" --sdk_root="$ANDROID_HOME" 'platform-tools' 'emulator' 'system-images;android-30;google_apis;arm64-v8a' > sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n native -k 'system-images;android-30;google_apis;arm64-v8a' --device pixel_4
+          sed -i '' '/^disk.dataPartition.size=/d' "$ANDROID_AVD_HOME/native.avd/config.ini"
+          echo 'disk.dataPartition.size=10000M' >>"$ANDROID_AVD_HOME/native.avd/config.ini"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_I_WANT_MY_TCG=yes
+          accel=off
+          if emulator -accel-check 2>&1 | grep -qi 'installed and usable\|is working\|operational'; then accel=auto; fi
+          emulator -avd native -accel "$accel" -no-window -no-boot-anim -no-audio -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 2304 >arm-emulator.log 2>&1 &
+          emupid=$!
+          trap 'tail -35 arm-emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          adb start-server
+          for i in $(seq 1 50); do
+            if ! kill -0 "$emupid" 2>/dev/null; then exit 1; fi
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
+            sleep 5
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          adb shell wm dismiss-keyguard
+          adb shell getprop ro.product.cpu.abilist
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v53"
+          for file in full_check.py samples.json; do curl -fsSL --retry 2 "$src/$file" -o "$file"; done
+          curl -fsSL --retry 2 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.3-textures/RUSSIA_v5.3.apk" -o client.apk
+          echo 'e6d99119e011d02ef51590405db3b8c5627c213c4a62f57b9b2f8eeb824c2f1d  client.apk' | shasum -a 256 -c
+          adb install -g client.apk
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          python3 -u full_check.py
