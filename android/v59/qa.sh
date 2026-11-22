@@ -14,7 +14,7 @@ echo 'hw.lcd.width=720' >> "$cfg"
 echo 'hw.lcd.height=1280' >> "$cfg"
 echo 'hw.lcd.density=240' >> "$cfg"
 sudo apt-get -qq update
-sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa
+sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa python3-pil
 sudo setfacl -m "u:$(id -un):rw" /dev/kvm
 adb start-server
 emulator -avd repair -accel on -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 3072 -cores 4 -partition-size 10000 >emu.log 2>&1 &
@@ -41,5 +41,5 @@ adb shell settings put secure immersive_mode_confirmations confirmed
 src="$GITHUB_WORKSPACE"
 sed -e "s/^PKG='com.wn.blackrussia'/PKG='com.wn.russiarpfix'/" -e 's@/Android/data/com.wn.blackrussia/@/Android/data/com.wn.russiarpfix/@g' "$src/qa/v53-entry/full_check.py" > full_check.py
 cp "$src/android/v54/fresh.py" .
-python3 -c 'from PIL import Image'
-PYTHONPATH="$RUNNER_TEMP" python3 -u "$src/android/v59/play_test.py"
+/usr/bin/python3 -c 'from PIL import Image'
+PYTHONPATH="$RUNNER_TEMP" /usr/bin/python3 -u "$src/android/v59/play_test.py"
