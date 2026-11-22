@@ -1,0 +1,36 @@
+name: Publish verified RUSSIA v5.5 package
+on:
+  push:
+    branches: [fix/arm64-startup]
+    paths: ['.github/workflows/publish-v55.yml']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: client-v5.5-crash-sharing
+    steps:
+      - name: Verify the package and attach it to the release
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v55"
+          dl="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          curl -fsSL --retry 3 "$dl/client-v5.4-arm64-cache/RUSSIA_v5.4.apk" -o base.apk
+          echo '4624bcaa50a89b0c2c6c9b13985158e50167f15b78148c06e518d7d805fff1cf  base.apk' | sha256sum -c
+          for file in client.zst.b64 SHA256SUMS release.md; do curl -fsSL --retry 3 "$src/$file" -o "$file"; done
+          base64 -d client.zst.b64 > client.zst
+          zstd -dq --long=27 --patch-from=base.apk client.zst -o candidate.apk
+          sha256sum -c SHA256SUMS
+          sdk=$(ls -d "$ANDROID_HOME/build-tools"/* | sort -V | tail -1)
+          "$sdk/zipalign" -c -P 16 4 candidate.apk
+          "$sdk/apksigner" verify --verbose --print-certs candidate.apk
+          mv candidate.apk RUSSIA_v5.5.apk
+          expected=$(cut -d' ' -f1 SHA256SUMS)
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" RUSSIA_v5.5.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "RUSSIA v5.5 — отправка крашлога из настроек" --prerelease --notes-file release.md
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]|select(.name=="RUSSIA_v5.5.apk")|.digest' | grep -Fx "sha256:$expected"
