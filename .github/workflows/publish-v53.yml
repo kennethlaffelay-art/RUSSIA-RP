@@ -1,0 +1,37 @@
+name: Publish RUSSIA v5.3
+on:
+  push:
+    branches: [release/v53-texture-startup]
+    paths: ['.github/workflows/publish-v53.yml']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: client-v5.3-textures
+      SHA: e6d99119e011d02ef51590405db3b8c5627c213c4a62f57b9b2f8eeb824c2f1d
+    steps:
+      - name: Verify the signed package and publish it
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v53"
+          curl -fsSL --retry 3 "$src/client.patch" -o client.patch
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/client-v5.2-cache-recovery/RUSSIA_v5.2.apk" -o RUSSIA_v5.3.apk
+          echo '218ead3333e5caaff5d9abd5756b704e27f11eae451ac516c4d0a57c7719c0a1  RUSSIA_v5.3.apk' | sha256sum -c
+          git apply --binary client.patch
+          echo "$SHA  RUSSIA_v5.3.apk" | sha256sum -c
+          cat > notes.md <<'NOTES'
+          Установите RUSSIA_v5.3.apk поверх v5.2. В главном меню нажмите «Играть». На штатном экране клиент проверит доступные файлы и при необходимости скачает кэш с GitHub. Загрузка поддерживает докачку.
+
+          Исправлена инициализация пути к кэшу до старта графики. Добавлен список баз текстур loader/texdbs.cfg, который требуется движку при загрузке шрифтов. Версия пакета Android 1.6.5 (21).
+          При проверке на эмуляторе Android 11 ARM64 прежний вылет при чтении шрифтов устранён. Дальше процесс завершился с SIGILL, вход на сервер на этом устройстве не подтверждён.
+          NOTES
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" RUSSIA_v5.3.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "RUSSIA v5.3 — загрузка игровых текстур" --notes-file notes.md --prerelease
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]|select(.name=="RUSSIA_v5.3.apk")|.digest' | grep -Fx "sha256:$SHA"
