@@ -1,0 +1,79 @@
+name: Check game frames and popup registration on Android 16
+on:
+  push:
+    branches: [fix/arm64-startup]
+    paths: ['.github/workflows/verify-frame-v57.yml']
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {api: 36, image: google_apis, arch: x86_64, pages: 4096}
+    timeout-minutes: 32
+    steps:
+      - name: Verify the installed game EGL path on Android 16
+        shell: bash
+        env:
+          EXPECTED_PAGES: ${{ matrix.pages }}
+          API: ${{ matrix.api }}
+          IMAGE: ${{ matrix.image }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA"
+          dl="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          (for i in $(seq 1 30); do curl -fsSL "$dl/client-v5.7-game-surface/RUSSIA_v5.7.apk" -o candidate.apk && exit 0; sleep 5; done; exit 1) &
+          apkpid=$!
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/test-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          pkg="system-images;android-$API;$IMAGE;$ARCH"
+          "$sdk/sdkmanager" "$pkg" emulator platform-tools >sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n diag -k "$pkg" --device pixel_4
+          sed -i '/^disk.dataPartition.size=/d;/^hw.lcd./d' "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'disk.dataPartition.size=10000M' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'hw.lcd.width=720' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'hw.lcd.height=1280' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'hw.lcd.density=240' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa tesseract-ocr-rus
+          accel=on
+          if [[ "$ARCH" == arm64-v8a ]]; then export ANDROID_I_WANT_MY_TCG=yes; accel=off; else sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
+          adb start-server
+          emulator -avd diag -accel "$accel" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 3072 -cores 4 -partition-size 10000 >emu.log 2>&1 &
+          ep=$!
+          trap 'tail -18 emu.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 96); do
+            kill -0 "$ep" || { tail -65 emu.log; exit 1; }
+            if [[ "$(timeout 4 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
+            sleep 3
+          done
+          test "$(timeout 8 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          pages=$(adb shell getconf PAGE_SIZE | tr -d '\r')
+          echo "Android test environment uses $pages-byte pages"
+          test "$pages" = "$EXPECTED_PAGES"
+          abi=$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')
+          echo "Android $API reports $abi"
+          [[ "$abi" == *arm64-v8a* ]]
+          wait "$apkpid"
+          curl -fsSL --retry 3 "$src/android/v57/SHA256SUMS" -o SHA256SUMS
+          sha256sum -c SHA256SUMS
+          adb shell wm dismiss-keyguard
+          adb install -g --abi arm64-v8a candidate.apk
+          for file in AndroidManifest.xml Probe.java build-probe.sh; do curl -fsSL --retry 3 "$src/android/v57/qa/$file" -o "$file"; done
+          bash build-probe.sh
+          adb logcat -c
+          adb shell am start -W -n ru.russiarp.testframe/.Probe
+          for i in $(seq 1 35); do
+            adb logcat -d -s FrameProbe:I AndroidRuntime:E > frame.log
+            if grep -qE 'PROBE_PASS|PROBE_FAIL|FATAL EXCEPTION' frame.log; then break; fi
+            sleep 2
+          done
+          cat frame.log
+          grep -q 'PROBE_PASS' frame.log

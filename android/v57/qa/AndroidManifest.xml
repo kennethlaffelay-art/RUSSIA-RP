@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="ru.russiarp.testframe">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
+    <queries><package android:name="com.wn.blackrussia"/></queries>
+    <application android:label="Frame verification"><activity android:name=".Probe" android:exported="true"/></application>
+</manifest>
