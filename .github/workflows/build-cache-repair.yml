@@ -1,0 +1,28 @@
+name: Assemble and align the RUSSIA 5.9 cache repair APK
+on:
+  push:
+    branches: [release/v59-cache-repair]
+    paths: ['.github/workflows/build-cache-repair.yml', 'android/v59/build.sh', 'android/v59/package.py', 'android/v59/signing.py', 'android/v54/StockCache.java']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /android/v54/StockCache.java
+            /android/v59/
+      - name: Compile the fixed stock downloader and assemble the APK
+        run: bash android/v59/build.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aligned-cache-repair
+          path: ${{ runner.temp }}/aligned.apk
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
