@@ -36,4 +36,6 @@ jobs:
           PY
 
           curl -fsSL --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v59/inspect-launch.sh" -o inspect-launch.sh
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y ripgrep
           bash inspect-launch.sh
