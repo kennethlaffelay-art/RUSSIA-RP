@@ -1,0 +1,83 @@
+name: Verify and publish the signed RUSSIA 5.9 APK
+on:
+  push:
+    branches: [release/v59-cache-repair]
+    paths:
+      - .github/workflows/release-cache-repair.yml
+      - android/v59/release-signature.json
+      - android/v59/play_test.py
+      - android/v59/qa.sh
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /android/v59/
+            /android/v54/fresh.py
+            /qa/v53-entry/full_check.py
+      - name: Restore the exact aligned APK and verify its offline signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          src="$GITHUB_WORKSPACE/android/v59"
+          run=$(jq -r '.run_id' "$src/release-signature.json")
+          gh run download "$run" --repo "$GITHUB_REPOSITORY" --name aligned-cache-repair --dir .
+          python3 "$src/signing.py" apply aligned.apk "$src/release-signature.json" RUSSIA_v5.9.apk
+          sdk="$ANDROID_HOME/build-tools/35.0.0"
+          "$sdk/zipalign" -c -P 16 4 RUSSIA_v5.9.apk
+          "$sdk/apksigner" verify --verbose --print-certs RUSSIA_v5.9.apk > verifier.txt
+          grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' verifier.txt
+          grep -Fi '22bf7e8f5308b62daecc1cdf62413fb783eaf49258fb3c823c15c966f7750168' verifier.txt
+          sha256sum RUSSIA_v5.9.apk > SHA256SUMS
+      - name: Verify parallel installation and stock Play on Android 16
+        run: bash android/v59/qa.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verified-cache-repair
+          path: |
+            ${{ runner.temp }}/RUSSIA_v5.9.apk
+            ${{ runner.temp }}/SHA256SUMS
+            ${{ runner.temp }}/world-result.txt
+          compression-level: 0
+          if-no-files-found: error
+  publish:
+    needs: android
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: verified-cache-repair
+      - name: Publish a new versioned prerelease and compare the uploaded digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: client-v5.9-cache-repair
+        run: |
+          set -euo pipefail
+          sha256sum -c SHA256SUMS
+          printf '%s\n' 'Сборка 5.9 на основе 5.7. Версия Android-приложения 1.7.1 (27). Устанавливается отдельным приложением рядом с прежним клиентом.' '' 'При нажатии «Играть» проверяются контрольные суммы файлов карты и их копий для движка. Проверены цифровая подпись, установка ARM64-клиента на эмулятор Android 16, открытие главного меню и полная установка кэша через штатный экран загрузки.' > notes.md
+          case "$(cat world-result.txt)" in
+            native-crash) echo 'В тестовом эмуляторе игровой движок завершился с нативной ошибкой после установки кэша. Отрисовка мира на OnePlus не подтверждена.' >> notes.md ;;
+            java-crash) echo 'После установки кэша эмулятор зарегистрировал исключение приложения. Отрисовка мира на OnePlus не подтверждена.' >> notes.md ;;
+            map-files-and-lit-screen) echo 'В эмуляторе клиент открыл файлы карты и показал освещённый кадр. Вход на игровой сервер и работа на физическом OnePlus требуют отдельной проверки.' >> notes.md ;;
+            *) echo 'В эмуляторе завершилась установка кэша. Отрисовку игрового мира подтвердить не удалось.' >> notes.md ;;
+          esac
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" RUSSIA_v5.9.apk SHA256SUMS --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'RUSSIA v5.9 — проверка и восстановление файлов карты' --prerelease --notes-file notes.md
+          fi
+          expected=$(cut -d' ' -f1 SHA256SUMS)
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]|select(.name=="RUSSIA_v5.9.apk")|.digest' | grep -Fx "sha256:$expected"
