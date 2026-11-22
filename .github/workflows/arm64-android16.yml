@@ -35,7 +35,7 @@ jobs:
             if docker exec arm-android /system/bin/setprop service.sf.prime_shader_cache 0 2>/dev/null; then break; fi
             sleep 1
           done
-          for i in $(seq 1 60); do
+          for i in $(seq 1 24); do
             adb connect 127.0.0.1:15555 > /dev/null 2>&1 || true
             if [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
             sleep 3
@@ -69,7 +69,8 @@ jobs:
           docker logs --tail=18 arm-android 2>&1 || true
           timeout 8 docker exec arm-android /system/bin/getprop sys.boot_completed || true
           timeout 8 docker exec arm-android /system/bin/getprop init.svc.zygote || true
-          timeout 8 docker exec arm-android /system/bin/logcat -d -b crash | grep -E 'Abort message|#[01]+ pc|Fatal signal|FATAL EXCEPTION' | tail -16 || true
+          timeout 8 docker exec arm-android /system/bin/logcat -d -s AndroidRuntime:E | grep -E 'system_server|Exception:|Caused by:|java.lang.[A-Za-z]+Error:' | tail -18 || true
+          timeout 8 docker exec arm-android /system/bin/logcat -d -b crash | grep -E 'Abort message' | tail -2 || true
           timeout 5 adb shell getprop init.svc.surfaceflinger || true
           timeout 5 adb logcat -d -b crash | grep -E 'signal |Abort message|Cause:|#[0-9]+ pc|ABI:' | grep -viE 'passw|token|bearer|https?://' | tail -65 || true
           timeout 8 adb logcat -d -s 'AXL:*' | grep -iE 'failed|init|texture|load|error|not found|models' | grep -viE 'passw|token|bearer|https?:|login|account|settings.ini' | tail -35 || true
