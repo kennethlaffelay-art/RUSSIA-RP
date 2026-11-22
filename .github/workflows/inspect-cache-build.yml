@@ -34,3 +34,6 @@ jobs:
                   if 'libmultiplayer.so' in n:
                       print('Config names:', [s[:100].decode('ascii','replace') for s in re.findall(rb'[ -~]{5,}', raw) if any(w in s.lower() for w in (b'.ini',b'server_ip',b'serverport',b'lastserver',b'server.ip'))][:50])
           PY
+
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/v59/inspect-launch.sh" -o inspect-launch.sh
+          bash inspect-launch.sh
