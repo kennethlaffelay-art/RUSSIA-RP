@@ -10,6 +10,7 @@ dir=$(dirname "$(find "$RUNNER_TEMP/omp-stage" -type f -name omp-server | head -
 pawn=$(find "$RUNNER_TEMP/compiler" -type f -name pawncc | head -1)
 cd "$dir"
 cat > testmode.pwn <<'PAWN'
+#pragma rational Float
 native print(const message[]);
 native AddPlayerClass(modelid, Float:x, Float:y, Float:z, Float:angle, w1, a1, w2, a2, w3, a3);
 native SetSpawnInfo(playerid, team, skin, Float:x, Float:y, Float:z, Float:angle, w1, a1, w2, a2, w3, a3);
