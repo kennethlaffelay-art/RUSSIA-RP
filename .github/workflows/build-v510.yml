@@ -1,0 +1,28 @@
+name: Build the Android client with explicit pre-launch server configuration
+on:
+  push:
+    branches: [fix/v510-game-entry]
+    paths: ['android/v510/ProjectEndpoint.java','android/v510/prepare.py','android/v510/build.sh','.github/workflows/build-v510.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /android/v54/StockCache.java
+            /android/v510/
+      - run: bash android/v510/build.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: generic-client-template
+          path: |
+            ${{ runner.temp }}/client-template.apk
+            ${{ runner.temp }}/apksigner.jar
+          compression-level: 0
+          retention-days: 7
