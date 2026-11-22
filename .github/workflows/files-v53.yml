@@ -61,7 +61,7 @@ jobs:
           echo '218ead3333e5caaff5d9abd5756b704e27f11eae451ac516c4d0a57c7719c0a1  base.apk' | sha256sum -c
           cp base.apk RUSSIA_v5.3.apk
           git apply --binary client.patch
-          echo 'a8d8398b5db0589975917427ddd6ac4eff6bbfac867dddccd2c3d235d902067b  RUSSIA_v5.3.apk' | sha256sum -c
+          echo 'e6d99119e011d02ef51590405db3b8c5627c213c4a62f57b9b2f8eeb824c2f1d  RUSSIA_v5.3.apk' | sha256sum -c
           abi=arm64-v8a
           if [[ "$SCENARIO" == fresh32 ]]; then abi=armeabi-v7a; fi
           echo "Testing game ABI $abi"

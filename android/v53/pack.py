@@ -32,7 +32,15 @@ while pos<len(data):
     pos+=length
 assert updated==1
 (work/'AndroidManifest.xml').write_bytes(data)
-inputs=['classes8.dex','AndroidManifest.xml']
+from cache_root import initialize_root
+libs=[]
+with ZipFile(base) as apk:
+    for abi in ('arm64-v8a','armeabi-v7a'):
+        member='lib/'+abi+'/libmultiplayer.so'
+        (work/member).parent.mkdir(parents=True,exist_ok=True)
+        (work/member).write_bytes(initialize_root(apk.read(member),abi))
+        libs.append(member)
+inputs=['classes8.dex','AndroidManifest.xml',*libs]
 unsigned=work/'unsigned.apk'
 shutil.copyfile(base,unsigned)
 subprocess.run(['zip','-qd',str(unsigned),*inputs],check=True)

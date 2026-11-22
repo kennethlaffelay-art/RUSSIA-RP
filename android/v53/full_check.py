@@ -213,7 +213,9 @@ def execute():
                 if not (cut and saved is not None and size>saved and 'прервана' in msg.get('text','')):
                     raise RuntimeError('Unexpected cache error: '+msg.get('text',''))
         c=crash()
-        if c:raise RuntimeError('Crash before cache commit: '+json.dumps(c))
+        if c:
+            if facts()[0]:break
+            raise RuntimeError('Crash before cache commit: '+json.dumps(c))
         time.sleep(2)
     else:raise RuntimeError('Cache not committed by time limit')
     event('CACHE_COMMITTED',saw_downloader=entered,largest_observed_download=largest)
