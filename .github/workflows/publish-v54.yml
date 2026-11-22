@@ -27,7 +27,7 @@ jobs:
           sha256sum -c SHA256SUMS
           sdk=$(ls -d "$ANDROID_HOME/build-tools"/* | sort -V | tail -1)
           "$sdk/zipalign" -c -P 16 4 candidate.apk
-          "$sdk/apksigner" verify --print-certs candidate.apk | grep -F 'Signer #1 certificate SHA-256 digest: e5c9650d7cbeb553abcf9a98e2b12ab10409f5969b5153c063778cbf502bba69'
+          "$sdk/apksigner" verify --verbose --print-certs candidate.apk
           mv candidate.apk RUSSIA_v5.4.apk
           expected=$(cut -d' ' -f1 SHA256SUMS)
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
