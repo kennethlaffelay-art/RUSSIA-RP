@@ -1,0 +1,137 @@
+name: Test 64-bit client on Android 16
+on:
+  push:
+    branches: [fix/arm64-startup]
+    paths: ['.github/workflows/arm64-android16.yml']
+permissions: {}
+jobs:
+  native:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {android: 16, image: 'redroid/redroid@sha256:e194edc99aa364358d1f8c214acb18b6d006c74fa0561f39259a20173ec30b66'}
+    name: Android ${{ matrix.android }} on ARM64
+    steps:
+      - name: Boot Android on native ARM processors
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          test "$(uname -m)" = aarch64
+          sudo modprobe binder_linux devices=binder,hwbinder,vndbinder
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb tesseract-ocr-rus
+          docker run -d --name arm-android --platform linux/arm64 --privileged -p 127.0.0.1:5555:5555 -v android-data:/data "$IMAGE" androidboot.use_memfd=true androidboot.redroid_gpu_mode=guest androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320
+          adb start-server
+          for i in $(seq 1 60); do
+            adb connect 127.0.0.1:5555 > /dev/null 2>&1 || true
+            if [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
+            sleep 3
+          done
+          docker ps -a --filter name=arm-android
+          test "$(timeout 5 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          adb shell getconf PAGE_SIZE
+          adb shell uname -m
+          adb shell getprop ro.dalvik.vm.native.bridge
+          test "$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')" = arm64-v8a
+      - name: Exercise the published APK through Play
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA"
+          dl="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          curl -fsSL --retry 3 "$src/qa/arm-hardware/observe.py" -o observe.py
+          curl -fsSL --retry 3 "$src/qa/v53-entry/full_check.py" -o full_check.py
+          curl -fsSL --retry 3 "$dl/client-v5.3-textures/RUSSIA_v5.3.apk" -o client.apk
+          echo 'e6d99119e011d02ef51590405db3b8c5627c213c4a62f57b9b2f8eeb824c2f1d  client.apk' | sha256sum -c
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g --abi arm64-v8a client.apk
+          adb shell dumpsys package com.wn.blackrussia | grep primaryCpuAbi
+          adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow
+          curl -fsSL --retry 3 "$dl/client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58/Rkkdev.zip" -o cache.zip
+          python3 -u observe.py
+      - name: Collect Android diagnostics
+        if: always()
+        run: |
+          docker logs --tail=18 arm-android 2>&1 || true
+          timeout 8 docker exec arm-android /system/bin/getprop sys.boot_completed || true
+          timeout 8 docker exec arm-android /system/bin/getprop init.svc.zygote || true
+          timeout 8 docker exec arm-android /system/bin/logcat -d -b crash | grep -E 'Abort message|#[01]+ pc|Fatal signal|FATAL EXCEPTION' | tail -16 || true
+          timeout 5 adb shell getprop init.svc.surfaceflinger || true
+          timeout 5 adb logcat -d -b crash | grep -E 'signal |Abort message|Cause:|#[0-9]+ pc|ABI:' | grep -viE 'passw|token|bearer|https?://' | tail -65 || true
+          timeout 8 adb logcat -d -s 'AXL:*' | grep -iE 'failed|init|texture|load|error|not found|models' | grep -viE 'passw|token|bearer|https?:|login|account|settings.ini' | tail -35 || true
+          docker rm -f arm-android >/dev/null 2>&1 || true
+  sdk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {api: 36, image: google_apis, arch: x86_64}
+    timeout-minutes: 32
+    steps:
+      - name: Run the 64-bit APK and collect application diagnostics
+        shell: bash
+        env:
+          API: ${{ matrix.api }}
+          IMAGE: ${{ matrix.image }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA"
+          curl -fsSL --retry 3 "$src/qa/arm-hardware/observe.py" -o observe.py
+          curl -fsSL --retry 3 "$src/qa/v53-entry/full_check.py" -o full_check.py
+          dl="https://github.com/$GITHUB_REPOSITORY/releases/download"
+          curl -fsSL --retry 3 "$dl/client-v5.3-textures/RUSSIA_v5.3.apk" -o client.apk &
+          apkpid=$!
+          curl -fsSL --retry 3 "$dl/client-v5-play-1cdd9c76725fdd1ab07f196a9e5fdcafd5c58/Rkkdev.zip" -o cache.zip &
+          zpid=$!
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/test-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          pkg="system-images;android-$API;$IMAGE;$ARCH"
+          "$sdk/sdkmanager" "$pkg" emulator platform-tools >sdk.log
+          echo no | "$sdk/avdmanager" create avd --force -n diag -k "$pkg" --device pixel_4
+          sed -i '/^disk.dataPartition.size=/d;/^hw.lcd./d' "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'disk.dataPartition.size=10000M' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'hw.lcd.width=720' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'hw.lcd.height=1280' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          echo 'hw.lcd.density=240' >> "$ANDROID_AVD_HOME/diag.avd/config.ini"
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0 libglu1-mesa tesseract-ocr-rus
+          accel=on
+          if [[ "$ARCH" == arm64-v8a ]]; then export ANDROID_I_WANT_MY_TCG=yes; accel=off; else sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
+          adb start-server
+          emulator -avd diag -accel "$accel" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -feature -Vulkan -camera-back none -camera-front none -memory 3072 -cores 4 -partition-size 10000 >emu.log 2>&1 &
+          ep=$!
+          trap 'tail -18 emu.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 96); do
+            kill -0 "$ep" || { tail -65 emu.log; exit 1; }
+            if [[ "$(timeout 4 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]]; then break; fi
+            sleep 3
+          done
+          test "$(timeout 8 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          abi=$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')
+          echo "Android $API reports $abi"
+          [[ "$abi" == *arm64-v8a* ]]
+          wait "$apkpid"
+          wait "$zpid"
+          echo 'e6d99119e011d02ef51590405db3b8c5627c213c4a62f57b9b2f8eeb824c2f1d  client.apk' | sha256sum -c
+          adb shell wm dismiss-keyguard || true
+          adb shell getconf PAGE_SIZE
+          adb install -g --abi arm64-v8a client.apk
+          adb shell dumpsys package com.wn.blackrussia | grep -m 1 primaryCpuAbi
+          if [[ "$API" -ge 30 ]]; then adb shell appops set com.wn.blackrussia MANAGE_EXTERNAL_STORAGE allow; fi
+          result=0
+          python3 -u observe.py || result=$?
+          adb logcat -d -s AXL:* NVEvent:* AndroidRuntime:E DEBUG:F libc:F > game.log
+          grep -iE 'signal |failed to|backtrace|libGame.so|libmultiplayer.so|ndk_translation|opcode|instruction|unsupported|file not found|database|load(ing)? |texture|critical|assert|error|CPU feature' game.log | grep -viE 'passw|bearer|token|https?:|login|account|settings.ini' | tail -105 || true
+          adb logcat -d -b all | grep -iE 'illegal instruction|unsupported (instruction|opcode)|unimplemented instruction|intrinsic|native bridge.*failed|SIGILL|FORTIFY|ubsan|unimplemented syscall' | tail -32 || true
+          exit "$result"
