@@ -95,6 +95,7 @@ public final class StockCache {
         if(fast)return true;
         CRC32 crc=new CRC32();
         try(InputStream in=new FileInputStream(f)){for(int n;(n=in.read(buffer))!=-1;){cancelled();crc.update(buffer,0,n);}}
+        catch (FileNotFoundException missing) { return false; }
         return crc.getValue()==expectedCrc;
     }
     private static class Entry {
@@ -121,6 +122,8 @@ public final class StockCache {
             if (!valid(temp.toFile(), entry.size, entry.crc, false, false))
                 throw new IOException("Не удалось проверить файл " + entry.name);
             move(temp.toFile(), entry.file);
+        } catch (IOException problem) {
+            throw new IOException("Не удалось установить " + entry.name + " из " + source.getName() + ": " + problem.getMessage(), problem);
         } finally {
             Files.deleteIfExists(temp);
         }
