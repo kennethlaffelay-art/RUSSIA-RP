@@ -1,0 +1,58 @@
+--- a/wn/src/main/cpp/multiplayer/game/Streaming.cpp
++++ b/wn/src/main/cpp/multiplayer/game/Streaming.cpp
+@@ -360,6 +360,39 @@
+     // .. CHook::Redirect("_ZN10CStreaming22LoadAllRequestedModelsEb", &CStreaming::LoadAllRequestedModels);
+ }
+ 
++// GTA caches this name after opening the archive and later looks for a backslash
++// before choosing a texture database. The Android file hook resolves disk casing.
++static bool WriteGameArchiveName(char (&output)[40], const char *input)
++{
++    unsigned length = 0;
++    unsigned leaf = 0;
++    while (input[length]) {
++        if (length == 39)
++            goto invalid;
++        char c = input[length++];
++        if (c == '/' || c == '\\') {
++            c = '\\';
++            leaf = length;
++        }
++        output[length - 1] = c;
++    }
++    if (length - leaf < 5)
++        goto invalid;
++    output[length] = 0;
++    if (leaf == 0) {
++        if (length > 37)
++            goto invalid;
++        for (unsigned i = length + 1; i != 0; --i)
++            output[i + 1] = output[i - 1];
++        output[0] = '.';
++        output[1] = '\\';
++    }
++    return true;
++invalid:
++    output[0] = 0;
++    return false;
++}
++
+ int CStreaming::AddImageToList(char const* pFileName, bool bNotPlayerImg) {
+     // find a free slot
+     std::int32_t fileIndex = 0;
+@@ -373,11 +406,10 @@
+         return -1;
+     }
+ 
+-    // free slot found, load the IMG file
+-    strncpy(ms_files[fileIndex].m_szName, pFileName, sizeof(ms_files[fileIndex].m_szName) - 1);
+-    ms_files[fileIndex].m_szName[sizeof(ms_files[fileIndex].m_szName) - 1] = '\0';
+-
+-    ms_files[fileIndex].m_StreamHandle = CdStreamOpen(pFileName);
++    auto& file = ms_files[fileIndex];
++    if (!WriteGameArchiveName(file.m_szName, pFileName))
++        return -1;
++    file.m_StreamHandle = CdStreamOpen(file.m_szName);
+     ms_files[fileIndex].m_bNotPlayerImg = bNotPlayerImg;
+ 
+     Log("CStreaming: IMG[%d] %s -> handle %d%s", fileIndex, pFileName,
