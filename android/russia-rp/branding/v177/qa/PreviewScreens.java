@@ -1,6 +1,7 @@
 package com.russiarp.qa;
 
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageView;
@@ -33,9 +34,13 @@ public final class PreviewScreens extends Screens {
         check("Russia Pass".contentEquals(title.getText()), "tier heading");
         View notification = inflate("br_notification");
         check(notification.findViewById(id("br_not_progress")) != null, "notification progress");
-        for (String kind : new String[]{"green", "red", "orange"}) {
-            int resource = res("background_br_notification_" + kind, "drawable");
-            check(context.getDrawable(resource) instanceof GradientDrawable, kind + " notification gradient");
+        String[] kinds = {"green", "red", "orange"};
+        int[][] expected = {{0xff7eac75, 0xff456a45}, {0xffc16355, 0xff743b34}, {0xffa45431, 0xffd68b60}};
+        for (int i = 0; i < kinds.length; i++) {
+            int resource = res("background_br_notification_" + kinds[i], "drawable");
+            LayerDrawable layers = (LayerDrawable) context.getDrawable(resource);
+            GradientDrawable gradient = (GradientDrawable) layers.getDrawable(0);
+            check(java.util.Arrays.equals(gradient.getColors(), expected[i]), kinds[i] + " notification colors");
         }
         capture(notification, "notification");
     }
