@@ -60,7 +60,7 @@ jobs:
           FROM debian:bookworm-slim
           RUN dpkg --add-architecture i386 && apt-get -qq update && apt-get -qq install -y --no-install-recommends qemu-user libc6:i386 libstdc++6:i386 libatomic1:i386 zlib1g:i386 ca-certificates
           IMAGE
-          docker run -d --name local-map --network container:test-phone -v "$RUNNER_TEMP/Server:/stage" -w /stage world-fixture qemu-i386 ./omp-server
+          docker run -d --name local-map --network container:test-phone -v "$RUNNER_TEMP/Server:/input:ro" --tmpfs /stage:rw,exec,size=256m -w /stage world-fixture sh -c 'cp -a /input/. /stage && stat -c "%i %n" components && exec qemu-i386 ./omp-server'
           for i in $(seq 1 20); do
             docker logs local-map > localserver.txt 2>&1
             if grep -qiE 'network started|Listening on|server started on' localserver.txt; then break; fi
@@ -68,6 +68,7 @@ jobs:
           done
           docker logs local-map 2>&1 | tail -20
           test "$(docker inspect -f '{{.State.Running}}' local-map)" = true
+          grep -qiE 'network started|Listening on|server started on' localserver.txt
       - name: Move the Android avatar through both map locations
         shell: bash
         run: |
