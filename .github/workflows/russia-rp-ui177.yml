@@ -1,0 +1,119 @@
+name: RUSSIA RP 1.7.7 preview on ARM64
+on:
+  push:
+    branches: [work/android-1.7.7-ui]
+    paths:
+      - 'android/russia-rp/branding/v177/**'
+      - '.github/workflows/russia-rp-ui177.yml'
+permissions:
+  contents: read
+env:
+  BASE_APK: https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.6/RUSSIA-RP-1.7.6.apk
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebuild the preview and sign the isolated test fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="$ANDROID_HOME/build-tools/35.0.0"
+          api="$ANDROID_HOME/platforms/android-35/android.jar"
+          sources="$GITHUB_WORKSPACE/android/russia-rp/branding"
+          cd "$RUNNER_TEMP"
+          mkdir -p smoke classes dex
+          curl -fLsS --retry 2 "$BASE_APK" -o smoke/base.apk
+          curl -fLsS --retry 2 https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar -o apktool.jar
+          echo '56d59c524fc764263ba8d345754d8daf55b1887818b15cd3b594f555d249e2db  apktool.jar' | sha256sum -c
+          python3 -m venv buildenv
+          buildenv/bin/pip install Pillow==11.3.0
+          buildenv/bin/python "$sources/v177/rebuild_177.py" --base smoke/base.apk --build-tools "$sdk" --apktool apktool.jar --preview --output preview.apk
+          javac -source 8 -target 8 -bootclasspath "$api" -d classes "$sources/v176/qa/Screens.java" "$sources/v177/qa/PreviewScreens.java"
+          "$sdk/d8" --min-api 23 --lib "$api" --output dex classes/com/russiarp/qa/*.class
+          "$sdk/aapt2" link -I "$api" --manifest "$sources/v177/qa/AndroidManifest.xml" -o fixture.apk
+          (cd dex && zip -q ../fixture.apk classes.dex)
+          "$sdk/zipalign" -f 4 fixture.apk fixture-aligned.apk
+          keytool -genkeypair -alias fixture -dname CN=UI-fixture -keyalg RSA -validity 2 -keystore fixture.p12 -storepass ephemeral -keypass ephemeral
+          "$sdk/apksigner" sign --ks fixture.p12 --ks-pass pass:ephemeral --out smoke/preview.apk preview.apk
+          "$sdk/apksigner" sign --ks fixture.p12 --ks-pass pass:ephemeral --out smoke/fixture.apk fixture-aligned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-inputs
+          path: ${{ runner.temp }}/smoke/*.apk
+          retention-days: 1
+  android:
+    needs: package
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: smoke-inputs
+          path: ${{ runner.temp }}/smoke
+      - name: Boot Android and install both clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          if ! sudo modprobe binder_linux; then
+            sudo apt-get -qq install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe binder_linux
+          fi
+          docker run --name test-phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid:12.0.0-latest androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=1280 androidboot.redroid_height=720
+          for n in $(seq 1 90); do
+            adb connect 127.0.0.1:5555 >/dev/null || true
+            if test "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1; then break; fi
+            sleep 2
+          done
+          adb shell getprop sys.boot_completed | grep -q 1
+          cd "$RUNNER_TEMP/smoke"
+          adb install -g base.apk
+          adb install -g preview.apk
+          adb install fixture.apk
+          adb shell pm path com.russiarp.game
+          adb shell pm path com.russiarp.test
+      - name: Exercise the launcher, HUD, notifications and season pass on ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb shell am start -W -n com.russiarp.test/blackrussia.online.activities.SplashActivity
+          sleep 4
+          adb shell pidof com.russiarp.test
+          timeout 120 adb shell am instrument -w com.russiarp.qa177/com.russiarp.qa.PreviewScreens | tee ui.txt
+          grep -q 'UI177 PASSED' ui.txt
+          mkdir -p screenshots
+          for p in $(docker exec test-phone sh -c 'ls /data/data/com.russiarp.test/files/qa176-*.jpg' | tr -d '\r'); do
+            docker exec test-phone cat "$p" > "screenshots/$(basename "$p")"
+          done
+          test "$(ls screenshots | wc -l)" -eq 6
+      - name: Start native gameplay with the reference cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 2 https://github.com/sunshineq1/cash-samp-russia/releases/download/v1.0/Weik.zip -o cache.zip
+          echo '090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b  cache.zip' | sha256sum -c
+          unzip -q cache.zip
+          unzip -q smoke/preview.apk 'assets/weik-defaults/*'
+          cp -an assets/weik-defaults/. Weik/
+          sed -i -E 's/^name[[:space:]]*=.*/name = Russia_Smoke/;s/^host[[:space:]]*=.*/host = 127.0.0.1/;s/^port[[:space:]]*=.*/port = 7777/' Weik/SAMP/settings.ini
+          adb push Weik /sdcard/ >/dev/null
+          adb shell appops set --uid com.russiarp.test MANAGE_EXTERNAL_STORAGE allow
+          adb logcat -c
+          adb shell am start -W -n com.russiarp.test/com.wn.blackrussia.game.Multiplayer
+          sleep 45
+          adb shell pidof com.russiarp.test
+          adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.wn.blackrussia.game.Multiplayer'
+          adb logcat -b crash -d > crash.txt
+          if grep -q com.russiarp.test crash.txt; then cat crash.txt; exit 1; fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ui177
+          path: ${{ runner.temp }}/screenshots/
