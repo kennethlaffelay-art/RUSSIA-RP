@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.russiarp.qa178">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28"/>
+    <application android:label="RUSSIA RP UI tests"/>
+    <instrumentation android:name="com.russiarp.qa.HudScreens" android:targetPackage="com.russiarp.test"/>
+    <instrumentation android:name="com.russiarp.qa.PreviewScreens" android:targetPackage="com.russiarp.test"/>
+</manifest>
