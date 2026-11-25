@@ -101,7 +101,7 @@ jobs:
           adb shell am force-stop com.russiarp.game
           adb logcat -c
           docker exec test-phone am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
-          target_pid=$(docker top test-phone -eo pid,cmd | awk '$2 == "com.russiarp.game" {print $1;exit}')
+          target_pid=$(docker top test-phone -eo pid,cmd | awk '$2 == "com.russiarp.game" {if (!seen++) print $1}')
           if test -n "$target_pid"; then sudo timeout 80s strace -ff -qq -y -e trace=lseek,pread64 -p "$target_pid" -o "$RUNNER_TEMP/stream-files" 2>/dev/null & fi
           for n in $(seq 1 70); do
             docker logs local-map > server.out 2>&1
