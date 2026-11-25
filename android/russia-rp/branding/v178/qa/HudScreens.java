@@ -37,13 +37,15 @@ public final class HudScreens extends Screens {
 
     @Override public void onStart() {
         final Bundle result = new Bundle();
-        runOnMainSync(() -> {
-            try {
-                captureHud(1280, 720);
-                captureHud(1600, 720);
-                result.putString("stream", "HUD PASSED");
-            } catch (Throwable e) {
-                result.putString("stream", android.util.Log.getStackTraceString(e));
+        runOnMainSync(new Runnable() {
+            @Override public void run() {
+                try {
+                    captureHud(1280, 720);
+                    captureHud(1600, 720);
+                    result.putString("stream", "HUD PASSED");
+                } catch (Throwable e) {
+                    result.putString("stream", android.util.Log.getStackTraceString(e));
+                }
             }
         });
         finish("HUD PASSED".equals(result.getString("stream")) ? -1 : 0, result);
