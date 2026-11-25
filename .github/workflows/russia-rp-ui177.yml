@@ -46,6 +46,8 @@ jobs:
   android:
     needs: package
     runs-on: ubuntu-24.04-arm
+    env:
+      ANDROID_SERIAL: 127.0.0.1:5555
     timeout-minutes: 25
     steps:
       - uses: actions/download-artifact@v4
