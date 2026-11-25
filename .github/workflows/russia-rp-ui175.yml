@@ -1,0 +1,143 @@
+name: RUSSIA RP 1.7.5 interface and ARM startup
+on:
+  push:
+    branches: [qa/russia-rp-1.7.2-startup]
+    paths: [.github/workflows/russia-rp-ui175.yml]
+permissions:
+  contents: read
+env:
+  DOWNLOAD: https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.5/RUSSIA-RP-1.7.5.apk
+  CHECKSUM: 97caf7cd3f892fa6239b306749e87838574fed40e438a6b218ee0895f594a7dc
+jobs:
+  ui-fixture:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: android/russia-rp/branding/v175/qa
+      - name: Build the visual test fixture from source
+        shell: bash
+        run: |
+          set -euo pipefail
+          q="$GITHUB_WORKSPACE/android/russia-rp/branding/v175/qa"
+          cd "$RUNNER_TEMP"
+          sdk="$ANDROID_HOME/build-tools/35.0.0"
+          api="$ANDROID_HOME/platforms/android-35/android.jar"
+          mkdir -p classes dex ui-fixture
+          javac -source 8 -target 8 -bootclasspath "$api" -d classes "$q/Screens.java"
+          "$sdk/d8" --min-api 23 --lib "$api" --output dex classes/com/russiarp/qa/*.class
+          "$sdk/aapt2" link -I "$api" --manifest "$q/AndroidManifest.xml" -o fixture.apk
+          (cd dex && zip -q ../fixture.apk classes.dex)
+          "$sdk/zipalign" -f 4 fixture.apk fixture-aligned.apk
+          curl -fLsS --retry 2 "$DOWNLOAD" -o app.apk
+          echo "$CHECKSUM  app.apk" | sha256sum -c
+          keytool -genkeypair -alias qa -keyalg RSA -validity 2 -keystore qa.p12 -storepass ephemeral -keypass ephemeral -dname CN=Instrumentation
+          for input in app fixture-aligned; do
+            "$sdk/apksigner" sign --ks qa.p12 --ks-pass pass:ephemeral --out "ui-fixture/$input.apk" "$input.apk"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: isolated-ui-fixture
+          path: ${{ runner.temp }}/ui-fixture/*.apk
+          retention-days: 1
+  game:
+    runs-on: ubuntu-24.04-arm
+    needs: ui-fixture
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANDROID_SERIAL: 127.0.0.1:5555
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: isolated-ui-fixture
+          path: ${{ runner.temp }}/ui-fixture
+      - name: Boot an isolated ARM64 Android instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          if ! sudo modprobe binder_linux; then
+            sudo apt-get -qq install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe binder_linux
+          fi
+          docker pull redroid/redroid:12.0.0-latest
+          docker run --name test-phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid:12.0.0-latest androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=1280 androidboot.redroid_height=720
+          for n in $(seq 1 90); do
+            adb connect 127.0.0.1:5555 >/dev/null || true
+            if test "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1; then break; fi
+            sleep 2
+          done
+          adb devices -l
+          docker logs --tail 30 test-phone
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist | grep arm64
+      - name: Start the signed candidate twice with the checksum-verified map
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 2 "$DOWNLOAD" -o app.apk
+          echo "$CHECKSUM  app.apk" | sha256sum -c
+          curl -fLsS --retry 2 https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.4/RUSSIA-RP-1.7.4.apk -o previous.apk
+          echo '1406c4d026d56ee62a997cac58cb7176983a588086233553a310a769cd1f5dd1  previous.apk' | sha256sum -c
+          curl -fLsS --retry 2 https://github.com/sunshineq1/cash-samp-russia/releases/download/v1.0/Weik.zip -o cache.zip
+          echo '090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b  cache.zip' | sha256sum -c
+          unzip -q cache.zip
+          rm cache.zip
+          unzip -q app.apk 'assets/weik-defaults/*'
+          cp -an assets/weik-defaults/. Weik/
+          sed -i -E 's/^name[[:space:]]*=.*/name = Russia_Smoke/;s/^host[[:space:]]*=.*/host = 127.0.0.1/;s/^port[[:space:]]*=.*/port = 7777/' Weik/SAMP/settings.ini
+          rm -f Weik/reBRClientLog.txt Weik/samp_log.txt
+          adb wait-for-device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g ui-fixture/app.apk
+          adb install ui-fixture/fixture-aligned.apk
+          timeout 120 adb shell am instrument -w com.russiarp.qa/com.russiarp.qa.Screens | tee ui.txt
+          adb logcat -d -s RussiaUiTest | tail -55
+          grep -q 'UI175 PASSED' ui.txt
+          mkdir -p screenshots
+          for img in $(docker exec test-phone sh -c 'ls /data/data/com.russiarp.game/files/qa175-*.jpg' | tr -d '\r'); do
+            docker exec test-phone cat "$img" > "screenshots/$(basename "$img")"
+          done
+          test "$(ls screenshots | wc -l)" -eq 14
+          adb uninstall com.russiarp.qa
+          adb uninstall com.russiarp.game
+          adb install -g previous.apk
+          adb shell "mkdir -p /sdcard/Weik && touch /sdcard/Weik/upgrade-sentinel"
+          adb install -r -g app.apk
+          adb shell test -f /sdcard/Weik/upgrade-sentinel
+          adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb logcat -c
+          adb shell am start -W -n com.russiarp.game/blackrussia.online.activities.SplashActivity
+          sleep 4
+          adb shell pidof com.russiarp.game
+          adb logcat -b crash -d > launch-crash.txt
+          if grep -q 'com.russiarp.game' launch-crash.txt; then cat launch-crash.txt; exit 1; fi
+          adb exec-out screencap -p > screenshots/portrait-launcher.png
+          adb shell am force-stop com.russiarp.game
+          adb push Weik /sdcard/ > push.log
+          adb shell ls -l /sdcard/Weik/texdb/gta_int.img
+          for pass in 1 2; do
+            adb shell am force-stop com.russiarp.game
+            adb logcat -c
+            docker exec test-phone am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
+            sleep 45
+            adb logcat -d -s AXL AndroidRuntime DEBUG libc | tail -160
+            adb shell 'if [ -f /sdcard/Weik/reBRClientLog.txt ]; then tail -30 /sdcard/Weik/reBRClientLog.txt; fi'
+            adb logcat -b crash -d > crash.txt
+            if grep -q 'com.russiarp.game' crash.txt; then cat crash.txt; exit 1; fi
+            adb shell pidof com.russiarp.game | grep -E '[0-9]+'
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.wn.blackrussia.game.Multiplayer'
+            adb shell 'test -s /sdcard/Weik/SAMP/plates/rp_font.ttf'
+          done
+      - name: Attach Android screen captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ui175
+          path: ${{ runner.temp }}/screenshots/
