@@ -1,0 +1,48 @@
+name: Publish the verified 1.7.8 HUD preview
+on:
+  push:
+    branches: [release/android-1.7.8-hud]
+    paths: ['.github/workflows/publish-hud178.yml', 'android/russia-rp/branding/v178/release/signed-apk.zst']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: '45651948488'
+      SOURCE_SHA: '9246f80684d2db7af70dfb9be7f4cb19f4ab130d'
+      RELEASE_ID: '458340758'
+      TAG: 'russia-rp-v1.7.8-hud'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify the Android run and restore the signed APK
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '[.head_sha,.conclusion] | join(" ")')" = "$SOURCE_SHA success"
+          gh run download "$RUN_ID" -n hud-for-signing -D payload
+          gh run download "$RUN_ID" -n hud-comparison -D screenshots
+          echo '78a5a27f4f4214643d10a5e99767d2816ad3653366a021741605521c7fe06e10  payload/hud.apk' | sha256sum -c
+          zstd -q -d --patch-from=payload/hud.apk android/russia-rp/branding/v178/release/signed-apk.zst -o RUSSIA-RP-1.7.8-HUD.apk
+          echo '0e51dc291af843f3e015a5265482ca63b4aba68e0060b72822934f218c9a6768  RUSSIA-RP-1.7.8-HUD.apk' | sha256sum -c
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify RUSSIA-RP-1.7.8-HUD.apk
+          cp screenshots/after/qa176-1280-hud.jpg HUD-1.7.8.jpg
+      - name: Attach the APK and Android screenshot and publish the existing preview
+        run: |
+          set -euo pipefail
+          endpoint="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
+          gh api "$endpoint" | jq -e --arg t "$TAG" '.tag_name == $t and .prerelease and .draft and .target_commitish == "work/android-1.7.8-hud"'
+          for asset in RUSSIA-RP-1.7.8-HUD.apk HUD-1.7.8.jpg; do
+            digest="sha256:$(sha256sum "$asset" | cut -d' ' -f1)"
+            existing="$(gh api "$endpoint/assets" | jq -r --arg n "$asset" '.[] | select(.name == $n) | .digest')"
+            if test -z "$existing"; then
+              curl --fail-with-body --silent --show-error -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/octet-stream' --data-binary "@$asset" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$asset" | jq -e --arg d "$digest" '.state == "uploaded" and .digest == $d'
+            else
+              test "$existing" = "$digest"
+            fi
+          done
+          gh api -X PATCH "$endpoint" -F draft=false -F prerelease=true -f make_latest=false -f target_commitish="$SOURCE_SHA" --jq .html_url
