@@ -7,16 +7,31 @@ permissions:
   contents: read
 jobs:
   game:
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [arm64-v8a, x86_64]
-    timeout-minutes: 50
-    env:
-      IMAGE_ARCH: ${{ matrix.arch }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
     steps:
-      - name: Start the signed game with the matching map and report native crashes
+      - name: Boot an isolated ARM64 Android instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          if ! sudo modprobe binder_linux; then
+            sudo apt-get -qq install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe binder_linux
+          fi
+          docker pull redroid/redroid:12.0.0-latest
+          docker run --name test-phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid:12.0.0-latest androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=1280 androidboot.redroid_height=720
+          for n in $(seq 1 90); do
+            adb connect localhost:5555 >/dev/null || true
+            if test "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1; then break; fi
+            sleep 2
+          done
+          docker logs --tail 30 test-phone
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist | grep arm64
+      - name: Test the public APK with the full checksum-verified map
         shell: bash
         run: |
           set -euo pipefail
@@ -30,28 +45,7 @@ jobs:
           unzip -q app.apk 'assets/weik-defaults/*'
           cp -an assets/weik-defaults/. Weik/
           sed -i -E 's/^name[[:space:]]*=.*/name = Russia_Smoke/;s/^host[[:space:]]*=.*/host = 127.0.0.1/;s/^port[[:space:]]*=.*/port = 7777/' Weik/SAMP/settings.ini
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
-          export ANDROID_AVD_HOME="$RUNNER_TEMP/avds"
-          mkdir -p "$ANDROID_AVD_HOME"
-          sdkmanager "system-images;android-30;google_apis;$IMAGE_ARCH" > sdk.log
-          echo no | avdmanager create avd -f -n launcher -k "system-images;android-30;google_apis;$IMAGE_ARCH" --device pixel_4
-          test -s "$ANDROID_AVD_HOME/launcher.ini" || { echo "Locating created AVD"; ini=$(find "$RUNNER_TEMP" "$HOME" -name launcher.ini -print -quit); test -n "$ini"; export ANDROID_AVD_HOME="$(dirname "$ini")"; }
-          emulator -list-avds | grep -Fx launcher
-          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
-          echo "disk.dataPartition.size=8500M" >> "$ANDROID_AVD_HOME/launcher.avd/config.ini"
-          accel=on
-          if [[ "$IMAGE_ARCH" == arm64-v8a ]]; then accel=off; fi
-          emulator -avd launcher -partition-size 8500 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -accel "$accel" > emulator.log 2>&1 &
-          ep=$!
-          trap 'tail -12 emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
-          for i in $(seq 1 240); do
-            kill -0 "$ep" || exit 1
-            [[ "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]] && break
-            sleep 3
-          done
-          adb shell getprop sys.boot_completed | grep -q 1
-          adb shell getprop ro.product.cpu.abilist
-          adb root
+          rm -f Weik/reBRClientLog.txt Weik/samp_log.txt
           adb wait-for-device
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
@@ -60,15 +54,11 @@ jobs:
           adb push Weik /sdcard/ > push.log
           adb shell ls -l /sdcard/Weik/texdb/gta_int.img
           adb logcat -c
-          adb shell am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer | tee game-start.log
-          sleep 70
-          adb shell dumpsys activity activities | grep mResumedActivity || true
-          adb logcat -d | grep -Ei 'libGTASA|libmultiplayer|arm64|ndk_translation|rebrclient|NVEvent|signal [0-9]|missing .*file|failed to open|eglInitialize|FATAL EXCEPTION' | tail -150 || true
-          adb shell 'find /sdcard/Weik/ /sdcard/Android/data/com.russiarp.game/ -iname "*log*.txt" -o -iname "*crash*.log"' | head -70 || true
-          adb shell 'for f in /sdcard/Weik/reBRClientLog.txt /sdcard/Weik/SAMP/CRASHLOG.txt /sdcard/Weik/SAMP/samp-log.txt /sdcard/Weik/SAMP/client-log.txt /sdcard/Weik/crashlog.txt; do if [ -s "$f" ]; then echo "$f"; tail -70 "$f"; fi; done'
-          adb logcat -b crash -d > native-crash.txt
-          adb logcat -d -s AndroidRuntime DEBUG libc | tail -180
-          if grep -q 'com.russiarp.game' native-crash.txt; then cat native-crash.txt; exit 1; fi
+          adb shell am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
+          sleep 60
+          adb logcat -d -s AXL AndroidRuntime DEBUG libc | tail -160
+          adb shell 'if [ -f /sdcard/Weik/reBRClientLog.txt ]; then tail -30 /sdcard/Weik/reBRClientLog.txt; fi'
+          adb logcat -b crash -d > crash.txt
+          if grep -q 'com.russiarp.game' crash.txt; then cat crash.txt; exit 1; fi
           adb shell pidof com.russiarp.game | grep -E '[0-9]+'
-          adb shell dumpsys activity activities | grep mResumedActivity | grep 'com.wn.blackrussia.game.Multiplayer'
-          adb shell 'for f in /sdcard/Weik/reBRClientLog.txt /sdcard/Weik/SAMP/CRASHLOG.txt; do if [ -s "$f" ]; then tail -25 "$f"; fi; done'
+          adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.wn.blackrussia.game.Multiplayer'
