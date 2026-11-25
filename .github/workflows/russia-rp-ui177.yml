@@ -108,10 +108,8 @@ jobs:
           adb push Weik /sdcard/ >/dev/null
           adb shell appops set --uid com.russiarp.test MANAGE_EXTERNAL_STORAGE allow
           adb logcat -c
-          adb shell am start -W -n com.russiarp.test/com.wn.blackrussia.game.Multiplayer
-          sleep 45
-          adb shell pidof com.russiarp.test
-          adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.wn.blackrussia.game.Multiplayer'
+          timeout 120 adb shell am instrument -w -e mode game com.russiarp.qa177/com.russiarp.qa.PreviewScreens | tee game.txt
+          grep -q 'GAME177 PASSED' game.txt
           adb logcat -b crash -d > crash.txt
           if grep -q com.russiarp.test crash.txt; then cat crash.txt; exit 1; fi
       - if: always()

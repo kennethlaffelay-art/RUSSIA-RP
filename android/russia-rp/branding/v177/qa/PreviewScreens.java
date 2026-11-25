@@ -1,14 +1,25 @@
 package com.russiarp.qa;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 /** Exercise the real APK resources through Android's layout inflater on two screen sizes. */
 public final class PreviewScreens extends Screens {
+    private boolean gameOnly;
+
+    @Override public void onCreate(Bundle args) {
+        gameOnly = args != null && "game".equals(args.getString("mode"));
+        super.onCreate(args);
+    }
+
     @Override int id(String name) { return res(name, "id"); }
     @Override int res(String name, String type) {
         return context.getResources().getIdentifier(name, type, getTargetContext().getPackageName());
@@ -47,6 +58,22 @@ public final class PreviewScreens extends Screens {
 
     @Override public void onStart() {
         final Bundle result = new Bundle();
+        if (gameOnly) {
+            try {
+                Context app = getTargetContext();
+                Intent play = new Intent().setClassName(app, "com.wn.blackrussia.game.Multiplayer");
+                play.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Activity game = startActivitySync(play);
+                SystemClock.sleep(45000);
+                check(!game.isFinishing() && !game.isDestroyed() && game.hasWindowFocus(), "native game foreground");
+                result.putString("stream", "GAME177 PASSED");
+                finish(-1, result);
+            } catch (Throwable e) {
+                result.putString("stream", android.util.Log.getStackTraceString(e));
+                finish(0, result);
+            }
+            return;
+        }
         final Throwable[] failure = new Throwable[1];
         runOnMainSync(new Runnable() {
             @Override public void run() {
