@@ -1,6 +1,5 @@
 package com.russiarp.qa;
 
-import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.View;
@@ -44,12 +43,14 @@ public final class PreviewScreens extends Screens {
     @Override public void onStart() {
         final Bundle result = new Bundle();
         final Throwable[] failure = new Throwable[1];
-        runOnMainSync(() -> {
-            try {
-                checkScreens(1280, 720);
-                checkScreens(1600, 720);
-            } catch (Throwable e) {
-                failure[0] = e;
+        runOnMainSync(new Runnable() {
+            @Override public void run() {
+                try {
+                    checkScreens(1280, 720);
+                    checkScreens(1600, 720);
+                } catch (Throwable e) {
+                    failure[0] = e;
+                }
             }
         });
         result.putString("stream", failure[0] == null ? "UI177 PASSED" : android.util.Log.getStackTraceString(failure[0]));
