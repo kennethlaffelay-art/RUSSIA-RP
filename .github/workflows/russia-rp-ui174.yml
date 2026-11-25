@@ -55,6 +55,11 @@ jobs:
           echo 'b4fe7e21e512062d11bb86332447243b9770ffab01ef53eafb3f7b5792456276  ui.zst' | sha256sum -c
           zstd -qdf --long=27 --patch-from=previous.apk ui.zst -o app.apk
           echo '422396ce195ddd323cd889ae458947d7e87b5c960ed496f8643ba819a7badc6a  app.apk' | sha256sum -c
+          mv app.apk candidate.apk
+          gh api "repos/$GITHUB_REPOSITORY/git/blobs/1d77c023e3e2fd2cccf4b269a30c18ef179fe45b" --jq .content | base64 -d > refine.zst
+          echo '7bde159e416f2d9e04e40a88fe962243a3439460f22a9f2be6836eb8aeb92143  refine.zst' | sha256sum -c
+          zstd -qdf --long=27 --patch-from=candidate.apk refine.zst -o app.apk
+          echo '1406c4d026d56ee62a997cac58cb7176983a588086233553a310a769cd1f5dd1  app.apk' | sha256sum -c
           curl -fLsS --retry 2 https://github.com/sunshineq1/cash-samp-russia/releases/download/v1.0/Weik.zip -o cache.zip
           echo '090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b  cache.zip' | sha256sum -c
           unzip -q cache.zip
@@ -69,17 +74,25 @@ jobs:
           adb install -g app.apk
           adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
           adb shell appops get --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE
-          gh api 'repos/${{ github.repository }}/git/blobs/95708dcdfe4d086895c35af339cdd057ab18b7be' --jq .content | base64 -d > ui-test.apk
-          echo 'f0960a6898a52c73785410033d6ec1404364e4f93e3b8b3a28be71b1cf4e8562  ui-test.apk' | sha256sum -c
+          gh api 'repos/${{ github.repository }}/git/blobs/ae0a012019ef14956c60c421f02cf8c1137dff7e' --jq .content | base64 -d > ui-test.apk
+          echo 'fdfe76cab6044d9d7d8352551087e03634b3390abc0db6c65742e58c29d57f91  ui-test.apk' | sha256sum -c
           adb install ui-test.apk
-          adb shell am instrument -w com.russiarp.qa/com.russiarp.qa.Screens | tee ui.txt
+          timeout 120 adb shell am instrument -w com.russiarp.qa/com.russiarp.qa.Screens | tee ui.txt
           adb logcat -d -s RussiaUiTest | tail -55
           grep -q 'UI174 PASSED' ui.txt
           mkdir -p screenshots
           for img in $(docker exec test-phone sh -c 'ls /data/data/com.russiarp.game/files/qa174-*.jpg' | tr -d '\r'); do
             docker exec test-phone cat "$img" > "screenshots/$(basename "$img")"
           done
-          test "$(ls screenshots | wc -l)" -eq 10
+          test "$(ls screenshots | wc -l)" -eq 11
+          adb logcat -c
+          adb shell am start -W -n com.russiarp.game/blackrussia.online.activities.SplashActivity
+          sleep 4
+          adb shell pidof com.russiarp.game
+          adb logcat -b crash -d > launch-crash.txt
+          if grep -q 'com.russiarp.game' launch-crash.txt; then cat launch-crash.txt; exit 1; fi
+          adb exec-out screencap -p > screenshots/portrait-launcher.png
+          adb shell am force-stop com.russiarp.game
           adb push Weik /sdcard/ > push.log
           adb shell ls -l /sdcard/Weik/texdb/gta_int.img
           for pass in 1 2; do
@@ -122,5 +135,5 @@ jobs:
         run: |
           set -euo pipefail
           mv app.apk RUSSIA-RP-1.7.4.apk
-          echo '422396ce195ddd323cd889ae458947d7e87b5c960ed496f8643ba819a7badc6a  RUSSIA-RP-1.7.4.apk' | sha256sum -c
-          gh release create russia-rp-v1.7.4 RUSSIA-RP-1.7.4.apk --target "$GITHUB_SHA" --title 'РОССИЯ РП 1.7.4 · МОСКВА' --notes 'Новые логотип и иконка приложения, заставка с сохранением пропорций, контрастные карточки сервера и фирменные кнопки. Исправлено выравнивание персонажа и нижнего HUD. Включены исправления запуска и установка шрифта номеров при прямом входе в игру. Установите поверх предыдущей версии. При этом кэш Weik и настройки сохраняются.' --latest
+          echo '1406c4d026d56ee62a997cac58cb7176983a588086233553a310a769cd1f5dd1  RUSSIA-RP-1.7.4.apk' | sha256sum -c
+          gh release create russia-rp-v1.7.4 RUSSIA-RP-1.7.4.apk --target main --title 'РОССИЯ РП 1.7.4 · МОСКВА' --notes 'Новые логотип и иконка приложения, заставка с сохранением пропорций, контрастные карточки сервера и фирменные кнопки. Исправлено выравнивание персонажа и нижнего HUD. Включены исправления запуска и установка шрифта номеров при прямом входе в игру. Установите поверх предыдущей версии. При этом кэш Weik и настройки сохраняются.' --latest
