@@ -14,6 +14,17 @@ import android.widget.TextView;
 /** Exercise the real APK resources through Android's layout inflater on two screen sizes. */
 public final class PreviewScreens extends Screens {
     private boolean gameOnly;
+    private volatile Activity resumed;
+
+    @Override public void callActivityOnResume(Activity activity) {
+        super.callActivityOnResume(activity);
+        resumed = activity;
+    }
+
+    @Override public void callActivityOnPause(Activity activity) {
+        super.callActivityOnPause(activity);
+        if (resumed == activity) resumed = null;
+    }
 
     @Override public void onCreate(Bundle args) {
         gameOnly = args != null && "game".equals(args.getString("mode"));
@@ -63,9 +74,12 @@ public final class PreviewScreens extends Screens {
                 Context app = getTargetContext();
                 Intent play = new Intent().setClassName(app, "com.wn.blackrussia.game.Multiplayer");
                 play.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                Activity game = startActivitySync(play);
+                startActivitySync(play);
                 SystemClock.sleep(45000);
-                check(!game.isFinishing() && !game.isDestroyed() && game.hasWindowFocus(), "native game foreground");
+                Activity current = resumed;
+                check(current != null && current.getClass().getName().equals("com.wn.blackrussia.game.Multiplayer")
+                        && !current.isFinishing() && !current.isDestroyed(),
+                        "expected running Multiplayer, resumed=" + current);
                 result.putString("stream", "GAME177 PASSED");
                 finish(-1, result);
             } catch (Throwable e) {

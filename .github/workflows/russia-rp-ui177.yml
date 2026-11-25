@@ -108,7 +108,18 @@ jobs:
           adb push Weik /sdcard/ >/dev/null
           adb shell appops set --uid com.russiarp.test MANAGE_EXTERNAL_STORAGE allow
           adb logcat -c
-          timeout 120 adb shell am instrument -w -e mode game com.russiarp.qa177/com.russiarp.qa.PreviewScreens | tee game.txt
+          timeout 120 adb shell am instrument -w -e mode game com.russiarp.qa177/com.russiarp.qa.PreviewScreens > game.txt &
+          instrument_pid=$!
+          sleep 35
+          adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' > foreground.txt || true
+          cat foreground.txt
+          adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' || true
+          adb logcat -d -s AXL AndroidRuntime DEBUG libc | tail -80
+          adb logcat -b crash -d | tail -45
+          adb shell 'if [ -f /sdcard/Weik/reBRClientLog.txt ]; then tail -22 /sdcard/Weik/reBRClientLog.txt; fi'
+          wait "$instrument_pid"
+          cat game.txt
+          grep -q 'com.russiarp.test/com.wn.blackrussia.game.Multiplayer' foreground.txt
           grep -q 'GAME177 PASSED' game.txt
           adb logcat -b crash -d > crash.txt
           if grep -q com.russiarp.test crash.txt; then cat crash.txt; exit 1; fi
