@@ -1,0 +1,114 @@
+name: RUSSIA RP Lytkarino and hotel on ARM64
+on:
+  push:
+    branches: [qa/russia-rp-1.7.2-startup]
+    paths: [.github/workflows/russia-rp-world.yml]
+permissions:
+  contents: read
+jobs:
+  game:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANDROID_SERIAL: 127.0.0.1:5555
+    steps:
+      - name: Boot an isolated ARM64 Android instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          if ! sudo modprobe binder_linux; then
+            sudo apt-get -qq install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe binder_linux
+          fi
+          docker pull redroid/redroid:12.0.0-latest
+          docker run --name test-phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid:12.0.0-latest androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=1280 androidboot.redroid_height=720
+          for n in $(seq 1 90); do
+            adb connect 127.0.0.1:5555 >/dev/null || true
+            if test "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1; then break; fi
+            sleep 2
+          done
+          adb devices -l
+          docker logs --tail 30 test-phone
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist | grep arm64
+      - name: Run a loopback-only SA-MP compatibility server with the map fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 2 https://github.com/openmultiplayer/open.mp/releases/download/v1.6.7.3218/open.mp-linux-x86.tar.gz -o openmp.tar.gz
+          echo '0f7bfe70bb68ea780fe24a910b69412046e53d10feb65a9d4a9de8ff1f7f1329  openmp.tar.gz' | sha256sum -c
+          tar xzf openmp.tar.gz
+          echo 'dwgAAODxCAgEAAgA4AIAAFAOAAAQEgAAEFIAAEwAAAA4AAAAgAAAABgBAAAwAQAAMAEAADgBAABUBAAAOgEAAIQKAABFAQAAWAAAAFEBAAAEAQAAYAEAAAQCAABwAQAAXAIAAIUBAAAgAwAAmgEAAEwGAACoAQAAcAIAALcBAAAAAAAAwgEAAAAAAADLAQAAAAAAANsBAAAAAAAA6gEAAAAAAADwAQAAAAAAAP0BAAAAAAAACAIAAAAAAAAaAgAAAAAAACkCAAAAAAAANQIAAAAAAABHAgAAAAAAAF0CAAAAAAAAagIAAAAAAACAAgAAAAAAAIcCAAAAAAAAnAIAAAAAAACpAgAAAAAAALICAAAAAAAAuwIAAAAAAADEAgAAAAAAAMkCAAAAAAAAzwIAAAQAAEDXAgAAHwBFbnRlckhvdGVsAEZpbmlzaEhvdGVsAE9uR2FtZU1vZGVJbml0AE9uUGxheWVyQ29ubmVjdABPblBsYXllclJlcXVlc3RDbGFzcwBPblBsYXllclJlcXVlc3RTcGF3bgBPblBsYXllclNwYXduAE9uUGxheWVyVXBkYXRlAFNwYXduR3Vlc3QAZmxvYXRjbXAAU2V0R2FtZU1vZGVUZXh0AEFkZFBsYXllckNsYXNzAHByaW50AFNldFNwYXduSW5mbwBTZXRUaW1lckV4AElzUGxheWVyQ29ubmVjdGVkAEdldFBsYXllclN0YXRlAFNwYXduUGxheWVyAFNldFBsYXllckludGVyaW9yAFNldFBsYXllclZpcnR1YWxXb3JsZABTZXRQbGF5ZXJQb3MAU2V0Q2FtZXJhQmVoaW5kUGxheWVyAHByaW50ZgBTZXRQbGF5ZXJGYWNpbmdBbmdsZQBHZXRQbGF5ZXJQb3MAZmxvYXRhZGQAZmxvYXRhYnMAZmxvYXRzdWIAc2FtcABGbG9hdABwbGF5ZXJzAEZsb2F0AAAAAIB4AC6BCSkQKQwnCIB7ACwMIoBZI4BlMC6AWTAugQknCCcEgHsBLAiBCScAJwAnACcAJwAnACcAJ4SO6IAAJ4yXqIAAJ4ypjMAAJwcnLIB7AiwwgQkLATAugQknMCcEgHsDLAiBCScAJwAnACcAJwAnACcAJ4SO6IAAJ4yXqIAAJ4ypjMAAJwcngX8pDCc0gHsELDiBCYEFDCeBLCcAJ49QJ4EAJxSAewUsGIEJCwEwLoEJgQUMJ4FgJwAnh2gngTQnFIB7BSwYgQkLATAugQkLATAugQkpDCcEgHsGLAg1hWApDCcEgHsHLAgMATeFYAsBM4VkgFk1hhCBCSkMJwSAewgsCIEJCwEwLoEJJ4FoJwSAewMsCIEJJwApDCcIgHsJLAyBCScAKQwnCIB7CiwMgQknhI7ogAAnjJeogAAnjKmMwAApDCcQgHsLLBSBCSkMJwSAewwsCIEJgQUMJ4MQJwAngP0AJ4JkJxSAewUsGIEJCwEwLoEJJwAngxgnCIB7DSwMgQkpDCcEgHsGLAiAVDaJVIBZCYBUNolUgFkziVwLATWJcIEJgFkwgQknASkMJwiAewosDIEJJwEpDCcIgHsJLAyBCSeEpozAACeEp+7AACeEo+aAACkMJxCAewssFIEJJ4SZ0IAAKQwnCIB7DiwMgQkpDCcEgHsMLAiBCSeEOCcEgHsDLAiBCYEFDCeFRCcAJ4GcICeFFCcUgHsFLBiBCQsBMC6BCSkMJwSAewcsCAwBN40UgQkLATCBCScAJwAnAIEJgQV0gQV4gQV8KQwnEIB7DywUgQkDfAyEqYzAACQlJwiAexAsDCQnBIB7ESwIIguEi8CAACQkJScIMQgrNZEAA3gMhJeogAAkJScIgHsQLAwkJwSAexEsCCILhIvAgAAkJCUnCDEIKzWRAAuEjuiAAAR0JCUnCIB7EiwMJCcEgHsRLAgiC4SFgIAAJCQlJwgxCCs1kQALATORBIBZNZEogQmAWSQJgQOAbyqBCQuEo+aAAAR8JCUnCIB7EiwMJCcEgHsRLAgiC4SLwIAAJCQlJwgxCCs1lDwLhKfuwAAEeCQlJwiAexIsDCQnBIB7ESwIIguEi8CAACQkJScIMQgrNZQ8C4SmjMAABHQkJScIgHsSLAwkJwSAexEsCCILhIWAgAAkJCUnCDEIKzWUPAsBM5RAgFk1lGyBCYBZgFcEJAmBA4BvKoEJCwEsDDAugQmAWYBXBCQnhUwnCIB7DSwMgQkpDCcEgHsGLAg1ljCAWQkMAj6WMIBZgFcECQwCPpYwCwEzljSAWTWWYIEJJ4ZcJwSAewMsCIEJCwEwAACATYBhgHAggGOAaIBlgGOAawCAUYBBIIBjgGyAaYBlgG6AdCCAY4BvgG6AboBlgGOAdIBlgGQAgFOAcIBhgHeAboBHgHWAZYBzgHQAgGkAgFOAcIBhgHeAboBHgHWAZYBzgHQAgGkAgFGAQSCAYYB2gGGAdIBhgHIggHOAcIBhgHeAboBlgGQggGmAbiCATIB5gHSAa4BhgHKAaYBugG8AgEWAboB0gGWAcoBIgG+AdIBlgGwAgGkAgFGAQSCATIB5gHSAa4BhgHKAaYBugG8ggHKAZYBjgGWAaYB2gGWAZCAlgGQggG+Abi2AZoBvgG+AdCCAZoBygGGAbYBlgHMAgFGAQSCAaIBvgHSAZYBsIIB0gGWAbIBlgHCAb4BygHQggHOAZYBugHQAgEaAaYBugGmAc4BogEiAb4B0gGWAbACAaQCAUYBBIIBogG+AdIBlgGwggHKAZYBjgGWAaYB2gGWAZCAlgGQggG+Abi2AZoBvgG+AdCCAZoBygGGAbYBlgHMAgFGAQSCAYoBvgHSAaCCAc4BjgGWAboBlgHMggGOAb4BugGaAaYBygG2AZYBkAA==' | base64 -d > Server/gamemodes/world.amx
+          echo 'ce882762ad9380d9e94f9b43ffb433b9b2b40504f48c6e4b29b22360ec7070f4  Server/gamemodes/world.amx' | sha256sum -c
+          python - <<'PYCFG'
+          import json
+          from pathlib import Path
+          p=Path('Server/config.json')
+          d=json.loads(p.read_bytes())
+          d.update(announce=False,name='RUSSIA RP map fixture',max_players=2,enable_query=False)
+          d['network'].update(bind='127.0.0.1',port=7777)
+          d['pawn'].update(main_scripts=['world 1'],side_scripts=[],legacy_plugins=[])
+          d['rcon'].update(enable=False)
+          p.write_text(json.dumps(d))
+          PYCFG
+          docker build --quiet -t world-fixture - <<'IMAGE'
+          FROM debian:bookworm-slim
+          RUN dpkg --add-architecture i386 && apt-get -qq update && apt-get -qq install -y --no-install-recommends qemu-user libc6:i386 libstdc++6:i386 libatomic1:i386 zlib1g:i386 ca-certificates
+          IMAGE
+          docker run -d --name local-map --network container:test-phone -v "$RUNNER_TEMP/Server:/stage" -w /stage world-fixture qemu-i386 ./omp-server
+          for i in $(seq 1 20); do
+            docker logs local-map > localserver.txt 2>&1
+            if grep -qiE 'network started|Listening on|server started on' localserver.txt; then break; fi
+            sleep 1
+          done
+          docker logs local-map 2>&1 | tail -20
+          test "$(docker inspect -f '{{.State.Running}}' local-map)" = true
+      - name: Move the Android avatar through both map locations
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 2 https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.2/RUSSIA-RP-1.7.2.apk -o baseline.apk
+          echo '2ad0f0921a4243c2c4ccf5b8a240313b475a66ece1af3e8dc3d21ca9214d47b6  baseline.apk' | sha256sum -c
+          for part in 288ca4694be5e2cea0e74cfd09a80c706d293f5c 3dd7fe4c381e8283adfba70f4d8c2481e74a3ad5 78ff045b26a172f34453c015213943df34d85780 9513a8a55fb474aeb3526da3b3f8aaa8d231bdf6 2084b5b1fc62dd2e807401ef9b80767093c4ac75 90c0cb0965d7d638e422cda1348f2cf09e09b208 ed4726a40d26f13cd50c8549da125166e16694a7 13fee79b5b8016af80e19139e8e7996c944a5980 a71ff9481d9cad4251a29235349bb828bac208c1; do
+            gh api "repos/$GITHUB_REPOSITORY/git/blobs/$part" --jq .content | base64 -d >> release.zst
+          done
+          echo '7bd35bc49825a951920abb4c66d2acfbc7c2f9727d477c1a6cc1f026203fdab4  release.zst' | sha256sum -c
+          zstd -qdf --long=27 --patch-from=baseline.apk release.zst -o app.apk
+          echo '970658af58e84a537b38e20269a1fd1e22a0b97ef7c83e2358beba739d012321  app.apk' | sha256sum -c
+          curl -fLsS --retry 2 https://github.com/sunshineq1/cash-samp-russia/releases/download/v1.0/Weik.zip -o cache.zip
+          echo '090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b  cache.zip' | sha256sum -c
+          unzip -q cache.zip
+          rm cache.zip
+          unzip -q app.apk 'assets/weik-defaults/*'
+          cp -an assets/weik-defaults/. Weik/
+          sed -i -E 's/^name[[:space:]]*=.*/name = Russia_Smoke/;s/^host[[:space:]]*=.*/host = 127.0.0.1/;s/^port[[:space:]]*=.*/port = 7777/' Weik/SAMP/settings.ini
+          rm -f Weik/reBRClientLog.txt Weik/samp_log.txt
+          adb wait-for-device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g app.apk
+          adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb shell appops get --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE
+          adb push Weik /sdcard/ > push.log
+          adb shell ls -l /sdcard/Weik/texdb/gta_int.img
+          adb shell am force-stop com.russiarp.game
+          adb logcat -c
+          docker exec test-phone am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
+          for n in $(seq 1 70); do
+            docker logs local-map > server.out 2>&1
+            if grep -q 'QA both scenes confirmed' server.out; then break; fi
+            adb shell pidof com.russiarp.game >/dev/null || break
+            sleep 2
+          done
+          grep -Ei 'QA |join|connect|spawn|loaded|error' server.out | tail -35 || true
+          adb logcat -b crash -d > crash.txt
+          if grep -q 'com.russiarp.game' crash.txt; then tail -65 crash.txt; exit 1; fi
+          adb shell 'tail -25 /sdcard/Weik/reBRClientLog.txt' || true
+          adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.wn.blackrussia.game.Multiplayer'
+          grep -q 'QA both scenes confirmed' server.out
