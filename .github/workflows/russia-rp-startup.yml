@@ -1,0 +1,54 @@
+name: Check RUSSIA RP Android cold start
+on:
+  push:
+    branches: [qa/russia-rp-1.7.1-startup]
+    paths: [.github/workflows/russia-rp-startup.yml]
+permissions:
+  contents: read
+jobs:
+  launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Install the published APK and cold-start it twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.1/RUSSIA-RP-1.7.1.apk -o app.apk
+          echo '38594209c95b67f3ac498d00473ee298bdbc3fea568ff4733adca1122cb24723  app.apk' | sha256sum -c
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager 'system-images;android-30;google_apis;x86_64' > sdk.log
+          echo no | avdmanager create avd -f -n launcher -k 'system-images;android-30;google_apis;x86_64' --device pixel_4
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          emulator -avd launcher -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -accel on > emulator.log 2>&1 &
+          ep=$!
+          trap 'tail -12 emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 90); do
+            kill -0 "$ep" || exit 1
+            [[ "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]] && break
+            sleep 3
+          done
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g app.apk
+          package=com.russiarp.game
+          for attempt in 1 2; do
+            adb shell am force-stop "$package"
+            adb logcat -c
+            adb shell am start -W -n "$package/blackrussia.online.activities.SplashActivity" | tee start.log
+            grep -q 'Status: ok' start.log
+            for tick in $(seq 1 20); do
+              if adb shell dumpsys activity activities | grep 'mResumedActivity' | grep -F "$package/blackrussia.online.activities.MainActivity"; then break; fi
+              sleep 1
+            done
+            adb shell dumpsys activity activities > activities.txt
+            grep 'mResumedActivity' activities.txt | grep -F "$package/blackrussia.online.activities.MainActivity"
+            sleep 5
+            adb shell pidof "$package" | grep -E '[0-9]+'
+            adb logcat -b crash -d > crash.log
+            if grep -F "$package" crash.log; then cat crash.log; exit 1; fi
+            echo "Cold start $attempt passed"
+          done
