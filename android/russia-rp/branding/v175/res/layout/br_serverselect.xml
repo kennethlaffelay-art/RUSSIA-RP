@@ -1,0 +1,33 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:project="http://schemas.android.com/apk/prv/res/com.russiarp.game"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:importantForAccessibility="no"
+        android:scaleType="centerCrop" android:src="@*com.russiarp.game:drawable/server_select_background"/>
+    <LinearLayout android:id="@*com.russiarp.game:id/choose_server_root_loading" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
+        <com.tuyenmonkey.mkloader.MKLoader android:layout_width="36dp" android:layout_height="36dp" project:mk_color="#E7A176" project:mk_type="FishSpinner"/>
+        <TextView android:id="@*com.russiarp.game:id/br_ls_progress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="0%" android:textSize="14sp" android:textColor="#FFF6ED" android:fontFamily="@*com.russiarp.game:font/montserrat_bold"/>
+    </LinearLayout>
+    <LinearLayout android:id="@*com.russiarp.game:id/choose_server_root_choose" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:gravity="center_vertical|start" android:paddingStart="26dp" android:paddingEnd="20dp" android:paddingTop="6dp" android:paddingBottom="6dp" android:visibility="gone">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="14dp"
+            android:includeFontPadding="false" android:text="Выбор сервера" android:textColor="#FFFAF5" android:textSize="26sp" android:fontFamily="@*com.russiarp.game:font/montserrat_bold"/>
+        <LinearLayout android:layout_width="288dp" android:layout_height="42dp" android:orientation="horizontal" android:baselineAligned="false">
+            <Button android:id="@*com.russiarp.game:id/servers_btn_my_server" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"
+                android:background="@*com.russiarp.game:drawable/button_red_rectangle" android:text="Мой сервер" android:textColor="#FFF8F2" android:textSize="13sp" android:textAllCaps="false" android:stateListAnimator="@null" android:fontFamily="@*com.russiarp.game:font/pt_root_ui_bold"/>
+            <Space android:layout_width="8dp" android:layout_height="1dp"/>
+            <Button android:id="@*com.russiarp.game:id/all_servers_button" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"
+                android:background="@*com.russiarp.game:drawable/button_br_red_unfilled_ss" android:text="Все серверы" android:textColor="#FFF8F2" android:textSize="13sp" android:textAllCaps="false" android:stateListAnimator="@null" android:fontFamily="@*com.russiarp.game:font/pt_root_ui_bold"/>
+        </LinearLayout>
+        <ScrollView android:id="@*com.russiarp.game:id/main_servers_choose" android:layout_width="288dp" android:layout_height="150dp" android:layout_marginTop="12dp" android:scrollbars="none">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <include android:id="@*com.russiarp.game:id/server_main_frame" layout="@*com.russiarp.game:layout/br_serverselect_server"/>
+                <Button android:id="@*com.russiarp.game:id/br_servers_play" android:layout_width="match_parent" android:layout_height="46dp"
+                    android:background="@*com.russiarp.game:drawable/button_red_rectangle" android:text="Играть" android:textSize="17sp"
+                    android:textColor="#FFFAF5" android:textAllCaps="false" android:stateListAnimator="@null" android:fontFamily="@*com.russiarp.game:font/montserrat_bold"/>
+            </LinearLayout>
+        </ScrollView>
+        <ScrollView android:id="@*com.russiarp.game:id/list_servers_choose" android:layout_width="288dp" android:layout_height="150dp" android:layout_marginTop="12dp" android:scrollbars="vertical" android:visibility="gone">
+            <LinearLayout android:id="@*com.russiarp.game:id/scroll_layout_servers" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

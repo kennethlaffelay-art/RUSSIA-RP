@@ -1,0 +1,37 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:project="http://schemas.android.com/apk/prv/res/com.russiarp.game"
+    android:layout_width="match_parent" android:layout_height="94dp"
+    android:layout_marginBottom="8dp"
+    android:background="@*com.russiarp.game:drawable/server_rectangle_gradient"
+    android:paddingStart="14dp" android:paddingEnd="16dp">
+    <View android:id="@*com.russiarp.game:id/server_list_back_color"
+        android:layout_width="3dp" android:layout_height="40dp"
+        android:layout_gravity="start|center_vertical"
+        android:background="@*com.russiarp.game:drawable/server_rectangle_choose" />
+    <ImageView android:id="@*com.russiarp.game:id/br_server_image"
+        android:layout_width="49dp" android:layout_height="64dp"
+        android:layout_marginStart="13dp" android:layout_gravity="start|center_vertical"
+        android:scaleType="fitCenter" android:src="@*com.russiarp.game:drawable/br_peaw_servers" />
+    <LinearLayout android:orientation="vertical" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_gravity="center_vertical" android:layout_marginStart="78dp">
+        <TextView android:id="@*com.russiarp.game:id/br_server_name"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFF6ED" android:textSize="23sp" android:fontFamily="@*com.russiarp.game:font/montserrat_bold"/>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="Онлайн" android:textColor="#CBBDB3" android:textSize="12sp"
+                android:includeFontPadding="false" android:fontFamily="@*com.russiarp.game:font/pt_root_ui_medium"/>
+            <TextView android:id="@*com.russiarp.game:id/br_server_online"
+                android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false"
+                android:textColor="#FFF6ED" android:textSize="13sp" android:fontFamily="@*com.russiarp.game:font/montserrat_bold"/>
+        </LinearLayout>
+        <com.akexorcist.roundcornerprogressbar.RoundCornerProgressBar
+            android:id="@*com.russiarp.game:id/br_server_progress" android:layout_width="match_parent" android:layout_height="4dp" android:layout_marginTop="7dp"
+            project:rcMax="100" project:rcProgress="0" project:rcBackgroundPadding="0dp" project:rcRadius="2dp"
+            project:rcBackgroundColor="#554237" project:rcProgressColor="#D08352"/>
+    </LinearLayout>
+    <TextView android:id="@*com.russiarp.game:id/br_server_x2" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:visibility="gone" android:layout_gravity="end|top" android:text="x4" android:textColor="#E9A579"/>
+</FrameLayout>

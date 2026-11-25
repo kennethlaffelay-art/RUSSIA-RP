@@ -1,0 +1,1 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.russiarp.qa"><uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28"/><application android:label="RUSSIA RP UI checks"/><instrumentation android:name="com.russiarp.qa.Screens" android:targetPackage="com.russiarp.game"/></manifest>
