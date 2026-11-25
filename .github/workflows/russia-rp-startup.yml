@@ -18,12 +18,14 @@ jobs:
           curl -fsSL --retry 3 https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.1/RUSSIA-RP-1.7.1.apk -o app.apk
           echo '38594209c95b67f3ac498d00473ee298bdbc3fea568ff4733adca1122cb24723  app.apk' | sha256sum -c
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/test-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           sdkmanager 'system-images;android-30;google_apis;x86_64' > sdk.log
           echo no | avdmanager create avd -f -n launcher -k 'system-images;android-30;google_apis;x86_64' --device pixel_4
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           emulator -avd launcher -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -accel on > emulator.log 2>&1 &
           ep=$!
-          trap 'tail -12 emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          trap 'tail -12 emulator.log; adb logcat -b crash -d 2>/dev/null | tail -45; adb shell dumpsys activity activities 2>/dev/null | grep -E "mResumedActivity|topResumedActivity" | tail -5; adb emu kill >/dev/null 2>&1 || true' EXIT
           for i in $(seq 1 90); do
             kill -0 "$ep" || exit 1
             [[ "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]] && break
