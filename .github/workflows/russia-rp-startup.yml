@@ -1,0 +1,66 @@
+name: Check RUSSIA RP Android cold start
+on:
+  push:
+    branches: [qa/russia-rp-1.7.2-startup]
+    paths: [.github/workflows/russia-rp-startup.yml]
+permissions:
+  contents: read
+jobs:
+  launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Install the published APK and cold-start it twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          draft=$(gh api "repos/$GH_REPO/releases" --jq '.[] | select(.draft and (.name=="RUSSIA RP 1.7.2 · МОСКВА" or (.tag_name|startswith("untagged-")))) | select(any(.assets[]; .name=="RUSSIA-RP-1.7.2.apk")) | .id')
+          test "$(echo "$draft" | wc -l)" = 1 && test -n "$draft"
+          asset=$(gh api "repos/$GH_REPO/releases/$draft" --jq '.assets[] | select(.name=="RUSSIA-RP-1.7.2.apk") | .id')
+          gh api -H 'Accept: application/octet-stream' "repos/$GH_REPO/releases/assets/$asset" > app.apk
+          echo "RELEASE_ID=$draft" >> "$GITHUB_ENV"
+          echo '2ad0f0921a4243c2c4ccf5b8a240313b475a66ece1af3e8dc3d21ca9214d47b6  app.apk' | sha256sum -c
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager 'system-images;android-30;google_apis;x86_64' > sdk.log
+          echo no | avdmanager create avd -f -n launcher -k 'system-images;android-30;google_apis;x86_64' --device pixel_4
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          emulator -avd launcher -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -accel on > emulator.log 2>&1 &
+          ep=$!
+          trap 'tail -12 emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 90); do
+            kill -0 "$ep" || exit 1
+            [[ "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]] && break
+            sleep 3
+          done
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g app.apk
+          package=com.russiarp.game
+          for attempt in 1 2; do
+            adb shell am force-stop "$package"
+            adb logcat -c
+            adb shell am start -W -n "$package/blackrussia.online.activities.SplashActivity" | tee start.log
+            grep -q 'Status: ok' start.log
+            for tick in $(seq 1 20); do
+              if adb shell dumpsys activity activities | grep 'mResumedActivity' | grep -F "$package/blackrussia.online.activities.MainActivity"; then break; fi
+              sleep 1
+            done
+            adb shell dumpsys activity activities > activities.txt
+            grep 'mResumedActivity' activities.txt | grep -F "$package/blackrussia.online.activities.MainActivity"
+            sleep 5
+            adb shell pidof "$package" | grep -E '[0-9]+'
+            adb logcat -b crash -d > crash.log
+            if grep -F "$package" crash.log; then cat crash.log; exit 1; fi
+            echo "Cold start $attempt passed"
+          done
+      - name: Publish the verified APK
+        run: |
+          gh api --method PATCH "repos/$GH_REPO/releases/$RELEASE_ID" -f tag_name=russia-rp-v1.7.2 -f name='RUSSIA RP 1.7.2 · МОСКВА' -f target_commitish=main -F draft=false -F prerelease=true -f make_latest=false --jq .html_url
