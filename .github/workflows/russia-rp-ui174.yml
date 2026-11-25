@@ -1,0 +1,126 @@
+name: RUSSIA RP 1.7.4 interface and ARM startup
+on:
+  push:
+    branches: [qa/russia-rp-1.7.2-startup]
+    paths: [.github/workflows/russia-rp-ui174.yml]
+permissions:
+  contents: read
+jobs:
+  game:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANDROID_SERIAL: 127.0.0.1:5555
+    steps:
+      - name: Boot an isolated ARM64 Android instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          if ! sudo modprobe binder_linux; then
+            sudo apt-get -qq install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe binder_linux
+          fi
+          docker pull redroid/redroid:12.0.0-latest
+          docker run --name test-phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid:12.0.0-latest androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=1280 androidboot.redroid_height=720
+          for n in $(seq 1 90); do
+            adb connect 127.0.0.1:5555 >/dev/null || true
+            if test "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1; then break; fi
+            sleep 2
+          done
+          adb devices -l
+          docker logs --tail 30 test-phone
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist | grep arm64
+      - name: Start the signed candidate twice with the checksum-verified map
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 2 https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.2/RUSSIA-RP-1.7.2.apk -o baseline.apk
+          echo '2ad0f0921a4243c2c4ccf5b8a240313b475a66ece1af3e8dc3d21ca9214d47b6  baseline.apk' | sha256sum -c
+          for part in 288ca4694be5e2cea0e74cfd09a80c706d293f5c 3dd7fe4c381e8283adfba70f4d8c2481e74a3ad5 78ff045b26a172f34453c015213943df34d85780 9513a8a55fb474aeb3526da3b3f8aaa8d231bdf6 2084b5b1fc62dd2e807401ef9b80767093c4ac75 90c0cb0965d7d638e422cda1348f2cf09e09b208 ed4726a40d26f13cd50c8549da125166e16694a7 13fee79b5b8016af80e19139e8e7996c944a5980 a71ff9481d9cad4251a29235349bb828bac208c1; do
+            gh api "repos/$GITHUB_REPOSITORY/git/blobs/$part" --jq .content | base64 -d >> release.zst
+          done
+          echo '7bd35bc49825a951920abb4c66d2acfbc7c2f9727d477c1a6cc1f026203fdab4  release.zst' | sha256sum -c
+          zstd -qdf --long=27 --patch-from=baseline.apk release.zst -o app.apk
+          echo '970658af58e84a537b38e20269a1fd1e22a0b97ef7c83e2358beba739d012321  app.apk' | sha256sum -c
+          mv app.apk previous.apk
+          for part in 3c72cb7babc73c44646619a1421fcecd59a6d5be 701a84cc4f5a036d3e3ddeffc0a42c4d1bb0eeda b4f33bb09ac9ac9c58f73f508bfd5fd3545ce077 7cff40c0f90469614d63471138d41e0d5d1e1e85 ac8f4e1a4dd0c6ab03c80e5298adc80fcaf4546c a241e13dca38a06938dc878e21a6d6738c657534 553db0fed8e270fa239093b8e69de5577c2418f9 e84f7749f0060060122941f0b350104037060489 05e86e26e93dc95c143c9871bf2acb617d56adae 1f6c32af1276436cc40568cc3721e4cd088dd8bf bf48f978ebf576bd74ace1ff908de281a56432d3 d80a615dba595a362ec8c99cb6c06ad60c2ff843 976b9d1d749e7a9b99c021d379c903bb2ff2816d; do
+            gh api "repos/$GITHUB_REPOSITORY/git/blobs/$part" --jq .content | base64 -d >> ui.zst
+          done
+          echo 'b4fe7e21e512062d11bb86332447243b9770ffab01ef53eafb3f7b5792456276  ui.zst' | sha256sum -c
+          zstd -qdf --long=27 --patch-from=previous.apk ui.zst -o app.apk
+          echo '422396ce195ddd323cd889ae458947d7e87b5c960ed496f8643ba819a7badc6a  app.apk' | sha256sum -c
+          curl -fLsS --retry 2 https://github.com/sunshineq1/cash-samp-russia/releases/download/v1.0/Weik.zip -o cache.zip
+          echo '090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b  cache.zip' | sha256sum -c
+          unzip -q cache.zip
+          rm cache.zip
+          unzip -q app.apk 'assets/weik-defaults/*'
+          cp -an assets/weik-defaults/. Weik/
+          sed -i -E 's/^name[[:space:]]*=.*/name = Russia_Smoke/;s/^host[[:space:]]*=.*/host = 127.0.0.1/;s/^port[[:space:]]*=.*/port = 7777/' Weik/SAMP/settings.ini
+          rm -f Weik/reBRClientLog.txt Weik/samp_log.txt
+          adb wait-for-device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g app.apk
+          adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb shell appops get --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE
+          gh api 'repos/${{ github.repository }}/git/blobs/95708dcdfe4d086895c35af339cdd057ab18b7be' --jq .content | base64 -d > ui-test.apk
+          echo 'f0960a6898a52c73785410033d6ec1404364e4f93e3b8b3a28be71b1cf4e8562  ui-test.apk' | sha256sum -c
+          adb install ui-test.apk
+          adb shell am instrument -w com.russiarp.qa/com.russiarp.qa.Screens | tee ui.txt
+          adb logcat -d -s RussiaUiTest | tail -55
+          grep -q 'UI174 PASSED' ui.txt
+          mkdir -p screenshots
+          for img in $(docker exec test-phone sh -c 'ls /data/data/com.russiarp.game/files/qa174-*.jpg' | tr -d '\r'); do
+            docker exec test-phone cat "$img" > "screenshots/$(basename "$img")"
+          done
+          test "$(ls screenshots | wc -l)" -eq 10
+          adb push Weik /sdcard/ > push.log
+          adb shell ls -l /sdcard/Weik/texdb/gta_int.img
+          for pass in 1 2; do
+            adb shell am force-stop com.russiarp.game
+            adb logcat -c
+            docker exec test-phone am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
+            sleep 45
+            adb logcat -d -s AXL AndroidRuntime DEBUG libc | tail -160
+            adb shell 'if [ -f /sdcard/Weik/reBRClientLog.txt ]; then tail -30 /sdcard/Weik/reBRClientLog.txt; fi'
+            adb logcat -b crash -d > crash.txt
+            if grep -q 'com.russiarp.game' crash.txt; then cat crash.txt; exit 1; fi
+            adb shell pidof com.russiarp.game | grep -E '[0-9]+'
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.wn.blackrussia.game.Multiplayer'
+            adb shell 'test -s /sdcard/Weik/SAMP/plates/rp_font.ttf'
+          done
+      - name: Attach Android screen captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ui174
+          path: ${{ runner.temp }}/screenshots/
+      - name: Keep the tested installer for publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-ui174
+          path: ${{ runner.temp }}/app.apk
+          retention-days: 2
+  publish:
+    needs: game
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-ui174
+      - name: Publish the verified installer
+        run: |
+          set -euo pipefail
+          mv app.apk RUSSIA-RP-1.7.4.apk
+          echo '422396ce195ddd323cd889ae458947d7e87b5c960ed496f8643ba819a7badc6a  RUSSIA-RP-1.7.4.apk' | sha256sum -c
+          gh release create russia-rp-v1.7.4 RUSSIA-RP-1.7.4.apk --target "$GITHUB_SHA" --title 'РОССИЯ РП 1.7.4 · МОСКВА' --notes 'Новые логотип и иконка приложения, заставка с сохранением пропорций, контрастные карточки сервера и фирменные кнопки. Исправлено выравнивание персонажа и нижнего HUD. Включены исправления запуска и установка шрифта номеров при прямом входе в игру. Установите поверх предыдущей версии. При этом кэш Weik и настройки сохраняются.' --latest
