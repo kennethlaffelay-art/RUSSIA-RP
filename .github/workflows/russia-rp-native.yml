@@ -9,6 +9,8 @@ jobs:
   game:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 25
+    env:
+      ANDROID_SERIAL: 127.0.0.1:5555
     steps:
       - name: Boot an isolated ARM64 Android instance
         shell: bash
@@ -24,10 +26,11 @@ jobs:
           docker pull redroid/redroid:12.0.0-latest
           docker run --name test-phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid:12.0.0-latest androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=1280 androidboot.redroid_height=720
           for n in $(seq 1 90); do
-            adb connect localhost:5555 >/dev/null || true
+            adb connect 127.0.0.1:5555 >/dev/null || true
             if test "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1; then break; fi
             sleep 2
           done
+          adb devices -l
           docker logs --tail 30 test-phone
           adb shell getprop sys.boot_completed | grep -q 1
           adb shell getprop ro.product.cpu.abilist | grep arm64
@@ -54,7 +57,7 @@ jobs:
           adb push Weik /sdcard/ > push.log
           adb shell ls -l /sdcard/Weik/texdb/gta_int.img
           adb logcat -c
-          adb shell am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
+          docker exec test-phone am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer
           sleep 60
           adb logcat -d -s AXL AndroidRuntime DEBUG libc | tail -160
           adb shell 'if [ -f /sdcard/Weik/reBRClientLog.txt ]; then tail -30 /sdcard/Weik/reBRClientLog.txt; fi'
