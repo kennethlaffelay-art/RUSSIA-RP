@@ -131,7 +131,13 @@ jobs:
           adb install -g app.apk
           adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
           adb shell appops get --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE
-          adb push Weik /sdcard/ > push.log
+          app_uid=$(adb shell cmd package list packages -U com.russiarp.game | tr -d '\r' | sed -n 's/.*uid://p')
+          [[ "$app_uid" =~ ^[0-9]+$ ]]
+          echo "Creating cache for application UID $app_uid"
+          chmod -R u+rwX,go+rX Weik
+          tar -cf - Weik | adb shell -T "su $app_uid tar -xf - -C /sdcard"
+          adb shell "su $app_uid ls -l /sdcard/Weik/SAMP/fonts/arial_bold.ttf /sdcard/Weik/texdb/gta_int.img"
+          adb shell "su $app_uid test -r /sdcard/Weik/SAMP/fonts/arial_bold.ttf"
           adb shell ls -l /sdcard/Weik/texdb/gta_int.img
           for pass in 1 2; do
             adb shell am force-stop com.russiarp.game
@@ -140,6 +146,8 @@ jobs:
             sleep 45
             adb logcat -d -s AXL AndroidRuntime DEBUG libc | tail -160
             adb shell 'if [ -f /sdcard/Weik/reBRClientLog.txt ]; then tail -30 /sdcard/Weik/reBRClientLog.txt; fi'
+            adb shell ls -l /sdcard/Weik/SAMP/plates/rp_font.ttf || true
+            adb logcat -d | grep -Ei 'Storage: |GetGameBaseDirectory|EACCES|permission denied' | tail -30 || true
             adb logcat -b crash -d > crash.txt
             if grep -q 'com.russiarp.game' crash.txt; then cat crash.txt; exit 1; fi
             adb shell pidof com.russiarp.game | grep -E '[0-9]+'
