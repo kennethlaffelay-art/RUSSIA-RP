@@ -60,7 +60,8 @@ jobs:
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
           adb install -g app.apk
-          adb shell appops set com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb shell appops get --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE
           adb push Weik /sdcard/ > push.log
           adb shell ls -l /sdcard/Weik/texdb/gta_int.img
           for pass in 1 2; do
@@ -128,7 +129,8 @@ jobs:
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
           adb install -g app.apk
-          adb shell appops set com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb shell appops set --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb shell appops get --uid com.russiarp.game MANAGE_EXTERNAL_STORAGE
           adb push Weik /sdcard/ > push.log
           adb shell ls -l /sdcard/Weik/texdb/gta_int.img
           for pass in 1 2; do
