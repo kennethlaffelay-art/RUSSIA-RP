@@ -1,0 +1,63 @@
+name: RUSSIA RP native game startup with Weik
+on:
+  push:
+    branches: [qa/russia-rp-1.7.2-startup]
+    paths: [.github/workflows/russia-rp-native.yml]
+permissions:
+  contents: read
+jobs:
+  game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Start the signed game with the matching map and report native crashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 2 https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.2/RUSSIA-RP-1.7.2.apk -o app.apk
+          echo '2ad0f0921a4243c2c4ccf5b8a240313b475a66ece1af3e8dc3d21ca9214d47b6  app.apk' | sha256sum -c
+          curl -fLsS --retry 2 https://github.com/sunshineq1/cash-samp-russia/releases/download/v1.0/Weik.zip -o cache.zip
+          echo '090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b  cache.zip' | sha256sum -c
+          unzip -q cache.zip
+          rm cache.zip
+          unzip -q app.apk 'assets/weik-defaults/*'
+          cp -an assets/weik-defaults/. Weik/
+          sed -i -E 's/^name[[:space:]]*=.*/name = Russia_Smoke/;s/^host[[:space:]]*=.*/host = 127.0.0.1/;s/^port[[:space:]]*=.*/port = 7777/' Weik/SAMP/settings.ini
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avds"
+          mkdir -p "$ANDROID_AVD_HOME"
+          sdkmanager 'system-images;android-30;google_apis;x86_64' > sdk.log
+          echo no | avdmanager create avd -f -n launcher -k 'system-images;android-30;google_apis;x86_64' --device pixel_4
+          test -s "$ANDROID_AVD_HOME/launcher.ini" || { echo "Locating created AVD"; ini=$(find "$RUNNER_TEMP" "$HOME" -name launcher.ini -print -quit); test -n "$ini"; export ANDROID_AVD_HOME="$(dirname "$ini")"; }
+          emulator -list-avds | grep -Fx launcher
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          echo "disk.dataPartition.size=8500M" >> "$ANDROID_AVD_HOME/launcher.avd/config.ini"
+          emulator -avd launcher -partition-size 8500 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -accel on > emulator.log 2>&1 &
+          ep=$!
+          trap 'tail -12 emulator.log; adb emu kill >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 90); do
+            kill -0 "$ep" || exit 1
+            [[ "$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" == 1 ]] && break
+            sleep 3
+          done
+          adb shell getprop sys.boot_completed | grep -q 1
+          adb shell getprop ro.product.cpu.abilist
+          adb root
+          adb wait-for-device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb install -g app.apk
+          adb shell appops set com.russiarp.game MANAGE_EXTERNAL_STORAGE allow
+          adb push Weik /sdcard/ > push.log
+          adb shell ls -l /sdcard/Weik/texdb/gta_int.img
+          adb logcat -c
+          adb shell am start -W -n com.russiarp.game/com.wn.blackrussia.game.Multiplayer | tee game-start.log
+          sleep 50
+          adb shell dumpsys activity activities | grep mResumedActivity || true
+          adb logcat -b crash -d > native-crash.txt
+          adb logcat -d -s AndroidRuntime DEBUG libc | tail -180
+          if grep -q 'com.russiarp.game' native-crash.txt; then cat native-crash.txt; exit 1; fi
+          adb shell pidof com.russiarp.game | grep -E '[0-9]+'
+          adb shell dumpsys activity activities | grep mResumedActivity | grep 'com.wn.blackrussia.game.Multiplayer'
+          adb shell 'for f in /sdcard/Weik/reBRClientLog.txt /sdcard/Weik/SAMP/CRASHLOG.txt; do if [ -s "$f" ]; then tail -25 "$f"; fi; done'
