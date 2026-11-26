@@ -1,0 +1,49 @@
+name: Publish RUSSIA RP 1.7.18
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/russia-rp/client-update/release/1.7.18/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release:
+    if: github.repository == 'kennethlaffelay-art/RUSSIA-RP' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Restore the signed APK from the published base
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/russia-rp/client-update/release/1.7.18"
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.17/RUSSIA-RP-1.7.17.apk" -o base.apk
+          echo 'e69d990afcb08a30283f590144ed5efe9ca89627808099e6c652eb0729a2e4f1  base.apk' | sha256sum -c -
+          for name in dictionary.py dex-edits.json bootstrap.zst client-update.json; do
+            curl -fsSL --retry 3 "$src/$name" -o "$name"
+          done
+          python3 dictionary.py base.apk dex-edits.json dictionary
+          zstd -qd --long=27 --patch-from=dictionary bootstrap.zst -o RUSSIA-RP-1.7.18.apk
+          echo '833571e51ceca05a32cb2d8f53c720fa00c6c94187a353632bc2d359e62e105a  RUSSIA-RP-1.7.18.apk' | sha256sum -c -
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          apk=pathlib.Path("RUSSIA-RP-1.7.18.apk")
+          meta=json.loads(pathlib.Path("client-update.json").read_text())
+          assert meta["versionCode"]==42 and meta["versionName"]=="1.7.18" and meta["package"]=="com.russiarp.hudx"
+          assert apk.stat().st_size==meta["size"] and hashlib.sha256(apk.read_bytes()).hexdigest()==meta["sha256"]
+          PY
+      - name: Publish the verified client and its update metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=russia-rp-v1.7.18
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" | jq -e '(.draft == false) and (.prerelease == false) and any(.assets[]; .name=="RUSSIA-RP-1.7.18.apk" and .digest=="sha256:833571e51ceca05a32cb2d8f53c720fa00c6c94187a353632bc2d359e62e105a") and any(.assets[]; .name=="client-update.json")'
+            exit
+          fi
+          gh release create "$tag" RUSSIA-RP-1.7.18.apk client-update.json --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest --title "RUSSIA RP 1.7.18 — автообновление клиента" --notes "Установите APK поверх 1.7.17. Лаунчер проверяет новые стабильные версии, докачивает APK после обрыва и предлагает установку через Android."
