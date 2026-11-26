@@ -1,0 +1,316 @@
+--- a/gamemodes/reBR.pwn
++++ b/gamemodes/reBR.pwn
+@@ -4293,5 +4293,6 @@
+  	CP_ACTION_TYPE_LUMBERJACK_PUT,
+  	
+- 	CP_ACTION_TYPE_GPS //gps
++ 	CP_ACTION_TYPE_GPS, //gps
++    CP_ACTION_TYPE_COURIER
+ };
+ 
+@@ -8553,8 +8554,9 @@
+ #define DIALOG_SNOW_INTENSITY 29781
+ #include "moscow_snow.inc"
++#include "winter_courier.inc"
+ 
+ public OnGameModeInit()
+ {
+-	print("[RUSSIA RP 1.7.16] Personal snowfall and winter roads");
++	print("[RUSSIA RP Winter 18] Layered snow and courier routes");
+     if(fexist("mirage_flood_limit.txt")) {
+         new File:f=fopen("mirage_flood_limit.txt",io_read),mirageRowText[12];
+@@ -9539,4 +9541,5 @@
+ public OnPlayerDisconnect(playerid, reason)
+ {
++    CourierFinish(playerid,false);
+     BR_ClearAppearance(playerid);
+     WinterLeave(playerid);
+@@ -9865,4 +9868,5 @@
+ public OnPlayerDeath(playerid, killerid, reason)
+ {
++    CourierFinish(playerid);
+     if(player_job_active{playerid}) {
+         DeleteVehicleMex(playerid,1);
+@@ -10203,4 +10207,5 @@
+ public OnVehicleDeath(vehicleid, killerid)
+ {
++    foreach(new owner:Player) { if(Pizza[owner]==vehicleid && GetPVarInt(owner,"PizzaCheck")) { CourierFinish(owner); break; } }
+ 	if(GetVehicleCarMarketID(vehicleid) != -1)
+ 		rent_cars_data[vehicleid - first_rent_car_id][rent_car_tenant_id] = INVALID_PLAYER_ID;
+@@ -10968,4 +10973,5 @@
+ public OnPlayerEnterCheckpoint(playerid)
+ {
++    if(GetPlayerCPInfo(playerid,CP_ACTION_TYPE)==CP_ACTION_TYPE_COURIER) return CourierDeliver(playerid);
+    if(GetPVarInt(playerid, "storage_checkpoint"))
+     {
+@@ -11200,95 +11206,4 @@
+ 	}
+     new carid = GetPlayerVehicleID(playerid);
+-	if(GetPVarInt(playerid, "PizzaCheck") == 1 )
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[2][0], PizzaCheckpoint[2][1], PizzaCheckpoint[2][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 2);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 2)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[3][0], PizzaCheckpoint[3][1], PizzaCheckpoint[3][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 3);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 3)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[4][0], PizzaCheckpoint[4][1], PizzaCheckpoint[4][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 4);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 4)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[5][0], PizzaCheckpoint[5][1], PizzaCheckpoint[5][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 5);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 5)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[6][0], PizzaCheckpoint[6][1], PizzaCheckpoint[6][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 6);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 6)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[7][0], PizzaCheckpoint[7][1], PizzaCheckpoint[7][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 7);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 7)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[8][0], PizzaCheckpoint[8][1], PizzaCheckpoint[8][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 8);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 8)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[9][0], PizzaCheckpoint[9][1], PizzaCheckpoint[9][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 9);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-	if(GetPVarInt(playerid, "PizzaCheck") == 9)
+-	{
+-	  DisablePlayerCheckpoint(playerid);
+-	  SetPlayerCheckpoint(playerid, PizzaCheckpoint[1][0], PizzaCheckpoint[1][1], PizzaCheckpoint[1][2], 2.0);
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы доставили заказ на нужную точку. На карте отмечена новая точка, отправляйтесь туда");
+-	  SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Для завершения работы и получения зарплаты {ffff00}/gps - По работе");
+-	  SetPVarInt(playerid, "PizzaCheck", 1);
+-	  SetPVarInt(playerid, "PizzaMoney", GetPVarInt(playerid, "PizzaMoney") + PizzaMoney);
+-	  return 1;
+-	}
+-
+     if(PlayerIsDalnoboi[playerid] == 2)
+ 	{
+@@ -12436,21 +12351,6 @@
+ 	}
+ 	
+-    if(pickupid == razdkyr)
+-	{
+-		if(GetPlayerJob(playerid) == 2)
+-		{
+-		    if(!GetPVarInt(playerid, "PizzaCheck"))
+-		    {
+-		    	Dialog(playerid, 17173, DIALOG_STYLE_MSGBOX, "{ffff00}Работа курьера", "Вы хотите начать работу курьера?", "Да", "Отмена");
+-			}
+-			else
+-			{
+-			    Dialog(playerid, 17174, DIALOG_STYLE_MSGBOX, "{ffff00}Работа курьера", "Вы хотите завершить работу курьера?", "Да", "Отмена");
+-			}
+-		}
+-		else return SendClientMessage(playerid, 0xCECECEFF, ""USC"Вы не курьер");
+-
+-	}
+-		
++    if(pickupid == razdkyr) return callcmd::courier(playerid);
++
+ 	/*if(pickupid == buspick1)
+ 	{
+@@ -15707,40 +15607,18 @@
+ 	switch(dialogid)
+ 	{
+-	    case 17173:
+-	        {
+-	            if(response)
+-	            {
+-		            new carid = GetPlayerVehicleID(playerid);
+-				    Pizza[playerid] = AddStaticVehicleEx(462,2772.048828,-2394.696044,21.486932,183.298797,0,0,6000);
+-					PutPlayerInVehicle(playerid, Pizza[playerid], 0);
+-	  				SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы успешно начали работать курьером!");
+-	  				SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"На карте отмечена точка, куда необходимо ехать");
+-	  				SetPlayerCheckpoint(playerid, PizzaCheckpoint[1][0], PizzaCheckpoint[1][1], PizzaCheckpoint[1][2], 2.0);
+-	  				SetPVarInt(playerid, "GetPlayerSkin", GetPlayerSkin(playerid));
+-	  				SetPlayerSkin(playerid, 155);
+-	  				SetPVarInt(playerid, "PizzaTime", gettime() + PizzaTime);
+-	  				SetPVarInt(playerid, "PizzaCheck", 1);
+-
+-	  				BR_BlackPassProgress(playerid, BP_EVENT_JOB_COURIER_START, 1);
+-	  				return 1;
+-				}
+-			}
+-			case 17174:
+-	        {
+-	            if(response)
+-	            {
+-	                new s[30];
+-	                SendClientMessage(playerid, COLOR_LIGHTBLUE, ""SC"Вы успешно завершили работать курьером!");
+-					GivePlayerMoneyEx(playerid, GetPVarInt(playerid, "PizzaMoney"), "kyr", true, true);
+-					SetPlayerSkin(playerid, GetPVarInt(playerid, "GetPlayerSkin"));
+-					DisablePlayerCheckpoint(playerid);
+-					DeletePVar(playerid, "PizzaTime");
+-					DeletePVar(playerid, "PizzaCheck");
+-					DeletePVar(playerid, "PizzaMoney");
+-					DeletePVar(playerid, "GetPlayerSkin");
+-					DestroyVehicle(Pizza[playerid]);
+-					return 1;
+-				}
+-			}
++        case 17173: {
++            if(response) CourierStart(playerid);
++            return 1;
++        }
++        case 17174: {
++            if(response) CourierFinish(playerid);
++            return 1;
++        }
++        case COURIER_DISPATCH: {
++            if(!response || !IsPlayerLogged(playerid) || !GetPVarInt(playerid,"PizzaCheck")) return 1;
++            if(listitem==0) return CourierMark(playerid);
++            if(listitem==1) return Dialog(playerid,17174,DIALOG_STYLE_MSGBOX,"Зимняя доставка","Завершить смену и вернуть мопед?","Завершить","Назад");
++            return 1;
++        }
+ 		case 17172:
+ 		    {
+@@ -16665,4 +16543,5 @@
+                     case 4: callcmd::dragy(playerid);
+                     case 6: return WinterShowView(playerid);
++                    case 7: return callcmd::courier(playerid);
+                     case 5: return Dialog(playerid,29610,DIALOG_STYLE_INPUT,"Гоночная дуэль","Введите ID соперника.","Пригласить","Назад");
+                 }
+@@ -41440,4 +41319,5 @@
+ public: EndPlayerJob(playerid)
+ {
++    CourierFinish(playerid);
+ 	if(IsPlayerInJob(playerid))
+ 	{
+@@ -53880,5 +53760,5 @@
+     if(!IsPlayerLogged(playerid)) return 1;
+     return Dialog(playerid,29609,DIALOG_STYLE_LIST,"Занятия в МОСКВЕ",
+-        "Автосервис — проложить маршрут\nНовогодние задания — найти Деда Мороза\nКаршеринг\nЗаказы электрика\nЗамер разгона\nГоночная дуэль\nПанорама зимней карты","Выбрать","Закрыть");
++        "Автосервис — проложить маршрут\nНовогодние задания — найти Деда Мороза\nКаршеринг\nЗаказы электрика\nЗамер разгона\nГоночная дуэль\nПанорама зимней карты\nЗимняя доставка — мопед и премия","Выбрать","Закрыть");
+ }
+ 
+@@ -69204,22 +69084,12 @@
+ 
+ 
+-forward SecondTimes(playerid);
+-public SecondTimes(playerid)
+-{
+-    if(GetPVarInt(playerid, "PizzaCheck") != 0 && GetPVarInt(playerid, "PizzaTime") <= gettime())
+-	{
+-		new s[30];
+-		format(s, sizeof(s), "ВЫ заработали %d руб", GetPVarInt(playerid, "PizzaMoney"));
+-		SendClientMessage(playerid, -1, s);
+-		GivePlayerMoneyEx(playerid, GetPVarInt(playerid, "PizzaMoney"), "kyr", true, true);
+-		SetPlayerSkin(playerid, GetPVarInt(playerid, "GetPlayerSkin"));
+-		DisablePlayerCheckpoint(playerid);
+-		DeletePVar(playerid, "PizzaTime");
+-		DeletePVar(playerid, "PizzaCheck");
+-		DeletePVar(playerid, "PizzaMoney");
+-		DeletePVar(playerid, "GetPlayerSkin");
+-		return 1;
+-	}
+-	return 1;
++forward SecondTimes();
++public SecondTimes()
++{
++    new now=gettime();
++    foreach(new p:Player) {
++        if(GetPVarInt(p,"PizzaCheck") && (GetPVarInt(p,"PizzaTime")<=now || GetPlayerJob(p)!=JOB_KYRER)) CourierFinish(p);
++    }
++    return 1;
+ }
+ 
+--- a/gamemodes/moscow_snow.inc
++++ b/gamemodes/moscow_snow.inc
+@@ -65,6 +65,7 @@
+ stock WinterMoveSnow(p,layer,tick,Float:x,Float:y,Float:z)
+ {
+-    new clock=tick+layer*11, period=clock/28, step=clock%28;
+-    new Float:mix=float(step)/28.0;
++    static const cycle[WINTER_LAYERS]={23,31,27,35,25};
++    new duration=cycle[layer], clock=tick+layer*11, period=clock/duration;
++    new Float:mix=float(clock%duration)/float(duration);
+     if(WinterFlakes[p][layer] && WinterPeriod[p][layer]==period
+         && floatabs(x-WinterCenter[p][layer][0])<3.0 && floatabs(y-WinterCenter[p][layer][1])<3.0
+@@ -72,6 +73,10 @@
+     WinterCenter[p][layer][0]=x; WinterCenter[p][layer][1]=y; WinterCenter[p][layer][2]=z;
+     WinterPeriod[p][layer]=period;
+-    static const Float:windX[WINTER_LAYERS]={1.3,1.7,1.1,1.5,1.25}, Float:windY[WINTER_LAYERS]={0.55,0.8,0.45,0.65,0.5};
+-    new Float:dx=windX[layer], Float:dy=windY[layer];
++    // Each layer follows a single continuous path until its next wrap.
++    static const Float:gustX[]={1.6,2.0,1.2,0.3,-0.8,-1.0,0.2,0.9};
++    static const Float:gustY[]={0.2,0.8,1.4,1.5,0.8,-0.2,-0.9,-0.4};
++    static const Float:depth[WINTER_LAYERS]={0.75,1.10,0.92,1.26,0.84};
++    new wind=((period*duration-layer*11+120)/90)%sizeof gustX;
++    new Float:dx=gustX[wind]*depth[layer], Float:dy=gustY[wind]*depth[layer];
+     static const Float:offsetX[WINTER_LAYERS]={-1.7,0.0,1.7,-1.0,1.1}, Float:offsetY[WINTER_LAYERS]={1.25,-1.6,1.25,-2.3,0.15};
+     x+=offsetX[layer];
+@@ -88,5 +93,5 @@
+     }
+     MovePlayerObject(p,WinterFlakes[p][layer]-1,x+dx,y+dy,z-5.0,
+-        floatsqroot(dx*dx+dy*dy+64.0)/9.8);
++        floatsqroot(dx*dx+dy*dy+64.0)/(float(duration)*0.35));
+     return 1;
+ }
+@@ -103,4 +108,13 @@
+         GetPlayerPos(p,x,y,z);
+         if(z>850.0) { WinterLeave(p);continue; }
++        new vehicle=GetPlayerVehicleID(p);
++        if(vehicle>0 && vehicle!=INVALID_VEHICLE_ID) {
++            new Float:vx,Float:vy,Float:vz;
++            GetVehicleVelocity(vehicle,vx,vy,vz);
++            // Lead the moving vehicle by up to eight map units on the next sample.
++            new Float:lead=12.0, Float:length=floatsqroot(vx*vx+vy*vy);
++            if(length>0.667) lead=8.0/length;
++            x+=vx*lead; y+=vy*lead;
++        }
+         for(new layer;layer<layers;layer++) WinterMoveSnow(p,layer,tick,x,y,z);
+     }
