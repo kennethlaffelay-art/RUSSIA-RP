@@ -1,0 +1,831 @@
+--- a/smali/blackrussia/online/DownloadService.smali
++++ b/smali/blackrussia/online/DownloadService.smali
+@@ -477,41 +477,10 @@
+     move-result-object v1
+ 
+     .line 181
+-    new-instance v2, Ljava/io/File;
+-
+-    const-wide v3, 0x3527f9fa0c74156fL    # 1.2516302227412448E-52
+-
+-    invoke-static {v3, v4}, Lcom/joom/paranoid/Deobfuscator$wn$Debug;->getString(J)Ljava/lang/String;
+-
+-    move-result-object v3
+-
+-    invoke-direct {v2, v1, v3}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+-
+-    new-instance v3, Ljava/net/URL;
+-
+-    const-wide v4, 0x3527f9ea0c74156fL    # 1.2516174780059557E-52
+-
+-    invoke-static {v4, v5}, Lcom/joom/paranoid/Deobfuscator$wn$Debug;->getString(J)Ljava/lang/String;
+-
+-    move-result-object v4
+-
+-    invoke-direct {v3, v4}, Ljava/net/URL;-><init>(Ljava/lang/String;)V
+-
+-    invoke-static {v0, v2, v3, p1}, Lblackrussia/online/WeikRelease;->select(Lblackrussia/online/WeikRelease;Ljava/io/File;Ljava/net/URL;Z)Lblackrussia/online/WeikRelease;
+-
+-    move-result-object p1
+-
+-    iget-object v3, p1, Lblackrussia/online/WeikRelease;->files:Ljava/util/Map;
+-
+-    invoke-static {v3}, Lblackrussia/online/WinterCatalog;->compatible(Ljava/util/Map;)Z
+-
+-    move-result v3
+-
+-    if-nez v3, :cond_1
+-
+-    move-object p1, v0
+-
+-    :cond_1
++    invoke-static {v0, v1, p1}, Lblackrussia/online/CacheUpdates;->select(Lblackrussia/online/WeikRelease;Ljava/io/File;Z)Lblackrussia/online/WeikRelease;
++
++    move-result-object p1
++
+     const/4 v0, 0x0
+ 
+     .line 183
+@@ -519,7 +488,7 @@
+ 
+     move-result-object v0
+ 
+-    if-eqz v0, :cond_2
++    if-eqz v0, :cond_1
+ 
+     .line 185
+     new-instance v2, Lblackrussia/online/WeikCache;
+@@ -569,7 +538,7 @@
+     return-object v2
+ 
+     .line 184
+-    :cond_2
++    :cond_1
+     new-instance p0, Ljava/io/IOException;
+ 
+     const-wide p1, 0x3527f9950c74156fL    # 1.2515497715997326E-52
+@@ -587,7 +556,7 @@
+ 
+     move-object p0, v0
+ 
+-    if-eqz v1, :cond_3
++    if-eqz v1, :cond_2
+ 
+     .line 177
+     :try_start_1
+@@ -604,7 +573,7 @@
+ 
+     invoke-virtual {p0, p1}, Ljava/lang/Throwable;->addSuppressed(Ljava/lang/Throwable;)V
+ 
+-    :cond_3
++    :cond_2
+     :goto_0
+     throw p0
+ .end method
+--- a/smali/blackrussia/online/WeikCache.smali
++++ b/smali/blackrussia/online/WeikCache.smali
+@@ -16,7 +16,7 @@
+ 
+ 
+ # static fields
+-.field private static final GENERATED:Ljava/util/Set;
++.field static final GENERATED:Ljava/util/Set;
+     .annotation system Ldalvik/annotation/Signature;
+         value = {
+             "Ljava/util/Set<",
+@@ -28,7 +28,7 @@
+ 
+ .field private static final LEGACY_SHA:Ljava/lang/String; = "090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b"
+ 
+-.field private static final LOCAL_DEFAULTS:Ljava/util/Set;
++.field static final LOCAL_DEFAULTS:Ljava/util/Set;
+     .annotation system Ldalvik/annotation/Signature;
+         value = {
+             "Ljava/util/Set<",
+@@ -40,15 +40,15 @@
+ 
+ 
+ # instance fields
+-.field private final archive:Ljava/io/File;
+-
+-.field private final archiveSize:J
++.field final archive:Ljava/io/File;
++
++.field final archiveSize:J
+ 
+ .field private final buffer:[B
+ 
+-.field private final defaults:Lblackrussia/online/WeikCache$Defaults;
+-
+-.field private final manifest:Ljava/util/Map;
++.field final defaults:Lblackrussia/online/WeikCache$Defaults;
++
++.field final manifest:Ljava/util/Map;
+     .annotation system Ldalvik/annotation/Signature;
+         value = {
+             "Ljava/util/Map<",
+@@ -59,17 +59,17 @@
+     .end annotation
+ .end field
+ 
+-.field private final progress:Lblackrussia/online/WeikCache$Progress;
+-
+-.field private final receipt:Ljava/io/File;
++.field final progress:Lblackrussia/online/WeikCache$Progress;
++
++.field final receipt:Ljava/io/File;
+ 
+ .field private final releaseSha:Ljava/lang/String;
+ 
+ .field private resolved:Ljava/net/URL;
+ 
+-.field private final root:Ljava/io/File;
+-
+-.field private final source:Ljava/net/URL;
++.field final root:Ljava/io/File;
++
++.field final source:Ljava/net/URL;
+ 
+ 
+ # direct methods
+@@ -980,425 +980,11 @@
+ .end method
+ 
+ .method private fetch(Ljava/lang/String;Lblackrussia/online/WeikCache$Entry;Ljava/io/File;JJ)V
+-    .locals 21
+-    .annotation system Ldalvik/annotation/Throws;
+-        value = {
+-            Ljava/io/IOException;
+-        }
+-    .end annotation
+-
+-    move-object/from16 v1, p0
+-
+-    move-object/from16 v0, p2
+-
+-    .line 322
+-    const-string v2, "-"
+-
+-    invoke-virtual/range {p3 .. p3}, Ljava/io/File;->length()J
+-
+-    move-result-wide v3
+-
+-    .line 323
+-    iget-wide v5, v0, Lblackrussia/online/WeikCache$Entry;->offset:J
+-
+-    add-long/2addr v5, v3
+-
+-    iget-wide v7, v0, Lblackrussia/online/WeikCache$Entry;->offset:J
+-
+-    iget-wide v9, v0, Lblackrussia/online/WeikCache$Entry;->packed:J
+-
+-    add-long/2addr v7, v9
+-
+-    const-wide/16 v9, 0x1
+-
+-    sub-long/2addr v7, v9
+-
+-    .line 324
+-    iget-object v9, v1, Lblackrussia/online/WeikCache;->resolved:Ljava/net/URL;
+-
+-    if-nez v9, :cond_0
+-
+-    iget-object v9, v1, Lblackrussia/online/WeikCache;->source:Ljava/net/URL;
+-
+-    :cond_0
+-    const/4 v10, 0x0
+-
+-    move v11, v10
+-
+-    :goto_0
+-    const/16 v12, 0x8
+-
+-    if-ge v11, v12, :cond_8
+-
+-    .line 326
+-    invoke-virtual {v9}, Ljava/net/URL;->getProtocol()Ljava/lang/String;
+-
+-    move-result-object v12
+-
+-    const-string v13, "https"
+-
+-    invoke-virtual {v12, v13}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result v12
+-
+-    if-eqz v12, :cond_7
+-
+-    .line 327
+-    invoke-virtual {v9}, Ljava/net/URL;->openConnection()Ljava/net/URLConnection;
+-
+-    move-result-object v12
+-
+-    check-cast v12, Ljava/net/HttpURLConnection;
+-
+-    const/16 v13, 0x3a98
+-
+-    .line 329
+-    :try_start_0
+-    invoke-virtual {v12, v13}, Ljava/net/HttpURLConnection;->setConnectTimeout(I)V
+-
+-    const/16 v13, 0x7530
+-
+-    .line 330
+-    invoke-virtual {v12, v13}, Ljava/net/HttpURLConnection;->setReadTimeout(I)V
+-
+-    .line 331
+-    invoke-virtual {v12, v10}, Ljava/net/HttpURLConnection;->setInstanceFollowRedirects(Z)V
+-
+-    .line 332
+-    invoke-virtual {v12, v10}, Ljava/net/HttpURLConnection;->setUseCaches(Z)V
+-
+-    .line 333
+-    const-string v13, "Accept-Encoding"
+-
+-    const-string v14, "identity"
+-
+-    invoke-virtual {v12, v13, v14}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
+-
+-    .line 334
+-    const-string v13, "Range"
+-
+-    new-instance v14, Ljava/lang/StringBuilder;
+-
+-    invoke-direct {v14}, Ljava/lang/StringBuilder;-><init>()V
+-
+-    const-string v15, "bytes="
+-
+-    invoke-virtual {v14, v15}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v14, v5, v6}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v14, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v14, v7, v8}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v14}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+-
+-    move-result-object v14
+-
+-    invoke-virtual {v12, v13, v14}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
+-
+-    .line 335
+-    invoke-virtual {v12}, Ljava/net/HttpURLConnection;->getResponseCode()I
+-
+-    move-result v13
+-
+-    const/16 v14, 0x12d
+-
+-    if-eq v13, v14, :cond_5
+-
+-    const/16 v14, 0x12e
+-
+-    if-eq v13, v14, :cond_5
+-
+-    const/16 v14, 0x12f
+-
+-    if-eq v13, v14, :cond_5
+-
+-    const/16 v14, 0x133
+-
+-    if-eq v13, v14, :cond_5
+-
+-    const/16 v14, 0x134
+-
+-    if-ne v13, v14, :cond_1
+-
+-    goto/16 :goto_3
+-
+-    .line 342
+-    :cond_1
+-    new-instance v10, Ljava/lang/StringBuilder;
+-
+-    invoke-direct {v10}, Ljava/lang/StringBuilder;-><init>()V
+-
+-    const-string v11, "bytes "
+-
+-    invoke-virtual {v10, v11}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v10, v5, v6}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v10, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v10, v7, v8}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;
+-
+-    const-string v2, "/"
+-
+-    invoke-virtual {v10, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    iget-wide v5, v1, Lblackrussia/online/WeikCache;->archiveSize:J
+-
+-    invoke-virtual {v10, v5, v6}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v10}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+-
+-    move-result-object v2
+-
+-    const/16 v5, 0xce
+-
+-    if-ne v13, v5, :cond_4
+-
+-    .line 343
+-    const-string v5, "Content-Range"
+-
+-    invoke-virtual {v12, v5}, Ljava/net/HttpURLConnection;->getHeaderField(Ljava/lang/String;)Ljava/lang/String;
+-
+-    move-result-object v5
+-
+-    invoke-virtual {v2, v5}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result v2
+-
+-    if-eqz v2, :cond_4
+-
+-    .line 345
+-    iput-object v9, v1, Lblackrussia/online/WeikCache;->resolved:Ljava/net/URL;
+-
+-    .line 346
+-    iget-object v14, v1, Lblackrussia/online/WeikCache;->progress:Lblackrussia/online/WeikCache$Progress;
+-
+-    add-long v17, p4, v3
+-
+-    const/4 v15, 0x2
+-
+-    move-object/from16 v16, p1
+-
+-    move-wide/from16 v19, p6
+-
+-    invoke-interface/range {v14 .. v20}, Lblackrussia/online/WeikCache$Progress;->update(ILjava/lang/String;JJ)V
+-
+-    .line 347
+-    invoke-virtual {v12}, Ljava/net/HttpURLConnection;->getInputStream()Ljava/io/InputStream;
+-
+-    move-result-object v2
+-    :try_end_0
+-    .catchall {:try_start_0 .. :try_end_0} :catchall_4
+-
+-    move-wide v13, v3
+-
+-    :try_start_1
+-    new-instance v3, Ljava/io/FileOutputStream;
+-
+-    const/4 v4, 0x1
+-
+-    move-object/from16 v15, p3
+-
+-    invoke-direct {v3, v15, v4}, Ljava/io/FileOutputStream;-><init>(Ljava/io/File;Z)V
+-    :try_end_1
+-    .catchall {:try_start_1 .. :try_end_1} :catchall_2
+-
+-    .line 348
+-    :try_start_2
+-    iget-wide v4, v0, Lblackrussia/online/WeikCache$Entry;->packed:J
+-
+-    sub-long/2addr v4, v13
+-
+-    move-object/from16 v6, p1
+-
+-    move-wide/from16 v9, p6
+-
+-    move-wide/from16 v7, v17
+-
+-    invoke-direct/range {v1 .. v10}, Lblackrussia/online/WeikCache;->copyBytes(Ljava/io/InputStream;Ljava/io/OutputStream;JLjava/lang/String;JJ)V
+-    :try_end_2
+-    .catchall {:try_start_2 .. :try_end_2} :catchall_0
+-
+-    .line 349
+-    :try_start_3
+-    invoke-virtual {v3}, Ljava/io/OutputStream;->close()V
+-    :try_end_3
+-    .catchall {:try_start_3 .. :try_end_3} :catchall_2
+-
+-    if-eqz v2, :cond_2
+-
+-    :try_start_4
+-    invoke-virtual {v2}, Ljava/io/InputStream;->close()V
+-    :try_end_4
+-    .catchall {:try_start_4 .. :try_end_4} :catchall_4
+-
+-    .line 351
+-    :cond_2
+-    invoke-virtual {v12}, Ljava/net/HttpURLConnection;->disconnect()V
++    .locals 0
++
++    invoke-static/range {p0 .. p7}, Lblackrussia/online/MemberTransfer;->fetch(Lblackrussia/online/WeikCache;Ljava/lang/String;Lblackrussia/online/WeikCache$Entry;Ljava/io/File;JJ)V
+ 
+     return-void
+-
+-    :catchall_0
+-    move-exception v0
+-
+-    move-object v1, v0
+-
+-    .line 347
+-    :try_start_5
+-    invoke-virtual {v3}, Ljava/io/OutputStream;->close()V
+-    :try_end_5
+-    .catchall {:try_start_5 .. :try_end_5} :catchall_1
+-
+-    goto :goto_1
+-
+-    :catchall_1
+-    move-exception v0
+-
+-    :try_start_6
+-    invoke-virtual {v1, v0}, Ljava/lang/Throwable;->addSuppressed(Ljava/lang/Throwable;)V
+-
+-    :goto_1
+-    throw v1
+-    :try_end_6
+-    .catchall {:try_start_6 .. :try_end_6} :catchall_2
+-
+-    :catchall_2
+-    move-exception v0
+-
+-    move-object v1, v0
+-
+-    if-eqz v2, :cond_3
+-
+-    :try_start_7
+-    invoke-virtual {v2}, Ljava/io/InputStream;->close()V
+-    :try_end_7
+-    .catchall {:try_start_7 .. :try_end_7} :catchall_3
+-
+-    goto :goto_2
+-
+-    :catchall_3
+-    move-exception v0
+-
+-    :try_start_8
+-    invoke-virtual {v1, v0}, Ljava/lang/Throwable;->addSuppressed(Ljava/lang/Throwable;)V
+-
+-    :cond_3
+-    :goto_2
+-    throw v1
+-
+-    .line 344
+-    :cond_4
+-    new-instance v0, Ljava/io/IOException;
+-
+-    new-instance v1, Ljava/lang/StringBuilder;
+-
+-    invoke-direct {v1}, Ljava/lang/StringBuilder;-><init>()V
+-
+-    const-string v2, "GitHub \u043d\u0435 \u0432\u0435\u0440\u043d\u0443\u043b \u043d\u0443\u0436\u043d\u0443\u044e \u0447\u0430\u0441\u0442\u044c \u0444\u0430\u0439\u043b\u0430 "
+-
+-    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    move-object/from16 v3, p1
+-
+-    invoke-virtual {v1, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    const-string v2, " (HTTP "
+-
+-    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v1, v13}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+-
+-    const-string v2, ")"
+-
+-    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+-
+-    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+-
+-    move-result-object v1
+-
+-    invoke-direct {v0, v1}, Ljava/io/IOException;-><init>(Ljava/lang/String;)V
+-
+-    throw v0
+-
+-    :cond_5
+-    :goto_3
+-    move-object/from16 v15, p3
+-
+-    move-wide v13, v3
+-
+-    move-object/from16 v3, p1
+-
+-    .line 337
+-    const-string v1, "Location"
+-
+-    invoke-virtual {v12, v1}, Ljava/net/HttpURLConnection;->getHeaderField(Ljava/lang/String;)Ljava/lang/String;
+-
+-    move-result-object v1
+-
+-    if-eqz v1, :cond_6
+-
+-    .line 339
+-    new-instance v4, Ljava/net/URL;
+-
+-    invoke-direct {v4, v9, v1}, Ljava/net/URL;-><init>(Ljava/net/URL;Ljava/lang/String;)V
+-    :try_end_8
+-    .catchall {:try_start_8 .. :try_end_8} :catchall_4
+-
+-    .line 351
+-    invoke-virtual {v12}, Ljava/net/HttpURLConnection;->disconnect()V
+-
+-    add-int/lit8 v11, v11, 0x1
+-
+-    move-object/from16 v1, p0
+-
+-    move-object v9, v4
+-
+-    move-wide v3, v13
+-
+-    goto/16 :goto_0
+-
+-    .line 338
+-    :cond_6
+-    :try_start_9
+-    new-instance v0, Ljava/io/IOException;
+-
+-    const-string v1, "GitHub \u043d\u0435 \u0432\u0435\u0440\u043d\u0443\u043b \u0430\u0434\u0440\u0435\u0441 \u0444\u0430\u0439\u043b\u0430"
+-
+-    invoke-direct {v0, v1}, Ljava/io/IOException;-><init>(Ljava/lang/String;)V
+-
+-    throw v0
+-    :try_end_9
+-    .catchall {:try_start_9 .. :try_end_9} :catchall_4
+-
+-    :catchall_4
+-    move-exception v0
+-
+-    .line 351
+-    invoke-virtual {v12}, Ljava/net/HttpURLConnection;->disconnect()V
+-
+-    throw v0
+-
+-    .line 326
+-    :cond_7
+-    new-instance v0, Ljava/io/IOException;
+-
+-    const-string/jumbo v1, "\u0414\u043b\u044f \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u043a\u0435\u0448\u0430 \u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f HTTPS"
+-
+-    invoke-direct {v0, v1}, Ljava/io/IOException;-><init>(Ljava/lang/String;)V
+-
+-    throw v0
+-
+-    .line 353
+-    :cond_8
+-    new-instance v0, Ljava/io/IOException;
+-
+-    const-string/jumbo v1, "\u0421\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u043f\u0435\u0440\u0435\u043d\u0430\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0439 GitHub"
+-
+-    invoke-direct {v0, v1}, Ljava/io/IOException;-><init>(Ljava/lang/String;)V
+-
+-    throw v0
+ .end method
+ 
+ .method private static hex([B)Ljava/lang/String;
+@@ -1836,19 +1422,32 @@
+ 
+     move-object/from16 v2, p2
+ 
++    invoke-static {v0, v2}, Lblackrussia/online/CacheUpdates;->worker(Lblackrussia/online/WeikCache;Lblackrussia/online/WeikCache$Entry;)Lblackrussia/online/WeikCache;
++
++    move-result-object v3
++
++    if-eq v0, v3, :cond_0
++
++    move-object/16 p0, v3
++
++    invoke-direct/range {p0 .. p8}, Lblackrussia/online/WeikCache;->repairOriginal(Ljava/lang/String;Lblackrussia/online/WeikCache$Entry;JJJ)V
++
++    return-void
++
++    :cond_0
+     iget-object v3, v2, Lblackrussia/online/WeikCache$Entry;->hash:Ljava/lang/String;
+ 
+     invoke-static {v3}, Lblackrussia/online/WinterCatalog;->original(Ljava/lang/String;)Lblackrussia/online/WeikCache$Entry;
+ 
+     move-result-object v9
+ 
+-    if-nez v9, :cond_0
++    if-nez v9, :cond_1
+ 
+     invoke-direct/range {p0 .. p8}, Lblackrussia/online/WeikCache;->repairOriginal(Ljava/lang/String;Lblackrussia/online/WeikCache$Entry;JJJ)V
+ 
+     return-void
+ 
+-    :cond_0
++    :cond_1
+     invoke-direct {v0, v1}, Lblackrussia/online/WeikCache;->destination(Ljava/lang/String;)Ljava/io/File;
+ 
+     move-result-object v5
+@@ -1861,7 +1460,7 @@
+ 
+     move-result v6
+ 
+-    if-nez v6, :cond_1
++    if-nez v6, :cond_2
+ 
+     move-object/from16 v7, p2
+ 
+@@ -1873,7 +1472,7 @@
+ 
+     move-result v6
+ 
+-    if-nez v6, :cond_1
++    if-nez v6, :cond_2
+ 
+     new-instance v0, Ljava/io/IOException;
+ 
+@@ -1883,7 +1482,7 @@
+ 
+     throw v0
+ 
+-    :cond_1
++    :cond_2
+     return-void
+ .end method
+ 
+@@ -2658,6 +2257,23 @@
+     .locals 4
+ 
+     .line 185
++    iget-wide v0, p1, Lblackrussia/online/WeikCache$Entry;->offset:J
++
++    const-wide/16 v2, 0x0
++
++    cmp-long v0, v0, v2
++
++    if-nez v0, :cond_0
++
++    iget-wide v0, p1, Lblackrussia/online/WeikCache$Entry;->packed:J
++
++    return-wide v0
++
++    :cond_0
++    invoke-static {p0, p1}, Lblackrussia/online/CacheUpdates;->worker(Lblackrussia/online/WeikCache;Lblackrussia/online/WeikCache$Entry;)Lblackrussia/online/WeikCache;
++
++    move-result-object p0
++
+     invoke-direct {p0, p1}, Lblackrussia/online/WeikCache;->partFile(Lblackrussia/online/WeikCache$Entry;)Ljava/io/File;
+ 
+     move-result-object v0
+@@ -2670,18 +2286,18 @@
+ 
+     cmp-long v2, v0, v2
+ 
+-    if-lez v2, :cond_0
++    if-lez v2, :cond_1
+ 
+     .line 186
+     iget-wide v2, p1, Lblackrussia/online/WeikCache$Entry;->packed:J
+ 
+     cmp-long v2, v0, v2
+ 
+-    if-gtz v2, :cond_0
++    if-gtz v2, :cond_1
+ 
+     return-wide v0
+ 
+-    :cond_0
++    :cond_1
+     invoke-direct {p0, p1}, Lblackrussia/online/WeikCache;->legacyPrefix(Lblackrussia/online/WeikCache$Entry;)J
+ 
+     move-result-wide v0
+@@ -2908,7 +2524,7 @@
+ 
+     const/4 v2, 0x0
+ 
+-    if-eqz v1, :cond_4
++    if-eqz v1, :cond_3
+ 
+     invoke-virtual {v0}, Ljava/io/File;->length()J
+ 
+@@ -2920,7 +2536,7 @@
+ 
+     if-eqz v1, :cond_1
+ 
+-    goto :goto_1
++    goto :goto_0
+ 
+     .line 97
+     :cond_1
+@@ -2957,70 +2573,36 @@
+     move-result-object v4
+ 
+     .line 100
+-    iget-object v5, p0, Lblackrussia/online/WeikCache;->releaseSha:Ljava/lang/String;
+-
+-    const-string v6, "090aaaf02b2697e8a6945cf4e0a82aa28c459a85d426f7a3a038e0aa8871050b"
+-
+-    invoke-virtual {v6, v5}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result v5
+-
+-    if-eqz v5, :cond_2
+-
+-    const-string v5, "release"
+-
+-    invoke-virtual {p3, v5}, Ljava/util/Properties;->getProperty(Ljava/lang/String;)Ljava/lang/String;
++    invoke-virtual {v3, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
++
++    move-result p3
++
++    if-nez p3, :cond_2
++
++    iget-object p2, p2, Lblackrussia/online/WeikCache$Entry;->hash:Ljava/lang/String;
++
++    invoke-direct {p0, v0}, Lblackrussia/online/WeikCache;->digestFile(Ljava/io/File;)Ljava/lang/String;
+ 
+     move-result-object p3
+ 
+-    invoke-virtual {v6, p3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result p3
+-
+-    if-eqz p3, :cond_2
+-
+-    .line 101
+-    invoke-virtual {v1, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result p3
+-
+-    if-eqz p3, :cond_2
+-
+-    goto :goto_0
+-
+-    .line 102
++    invoke-virtual {p2, p3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
++
++    move-result p2
++
++    if-nez p2, :cond_2
++
++    return v2
++
++    .line 103
+     :cond_2
+-    invoke-virtual {v3, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result p3
+-
+-    if-nez p3, :cond_3
+-
+-    iget-object p2, p2, Lblackrussia/online/WeikCache$Entry;->hash:Ljava/lang/String;
+-
+-    invoke-direct {p0, v0}, Lblackrussia/online/WeikCache;->digestFile(Ljava/io/File;)Ljava/lang/String;
+-
+-    move-result-object p3
+-
+-    invoke-virtual {p2, p3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+-
+-    move-result p2
+-
+-    if-nez p2, :cond_3
+-
+-    return v2
+-
+-    .line 103
++    invoke-virtual {p4, p1, v3}, Ljava/util/Properties;->setProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
++
++    const/4 p1, 0x1
++
++    return p1
++
+     :cond_3
+     :goto_0
+-    invoke-virtual {p4, p1, v3}, Ljava/util/Properties;->setProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+-
+-    const/4 p1, 0x1
+-
+-    return p1
+-
+-    :cond_4
+-    :goto_1
+     return v2
+ .end method
+ 
+--- a/smali/blackrussia/online/WeikCache$Entry.smali
++++ b/smali/blackrussia/online/WeikCache$Entry.smali
+@@ -1,4 +1,4 @@
+-.class final Lblackrussia/online/WeikCache$Entry;
++.class Lblackrussia/online/WeikCache$Entry;
+ .super Ljava/lang/Object;
+ .source "WeikCache.java"
+ 
+@@ -9,7 +9,7 @@
+ .end annotation
+ 
+ .annotation system Ldalvik/annotation/InnerClass;
+-    accessFlags = 0x18
++    accessFlags = 0x8
+     name = "Entry"
+ .end annotation
+ 
+--- a/smali_classes2/com/wn/blackrussia/BuildConfig.smali
++++ b/smali_classes2/com/wn/blackrussia/BuildConfig.smali
+@@ -10,9 +10,9 @@
+ 
+ .field public static final DEBUG:Z = false
+ 
+-.field public static final VERSION_CODE:I = 0x28
++.field public static final VERSION_CODE:I = 0x29
+ 
+-.field public static final VERSION_NAME:Ljava/lang/String; = "1.7.16"
++.field public static final VERSION_NAME:Ljava/lang/String; = "1.7.17"
+ 
+ 
+ # direct methods
