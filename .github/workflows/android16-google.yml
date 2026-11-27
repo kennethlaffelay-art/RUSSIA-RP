@@ -1,0 +1,42 @@
+name: Android 16 Google system image installation
+on:
+  push:
+    branches: [release/winter-1.7.30-vehicles]
+    paths: ['.github/workflows/android16-google.yml']
+permissions:
+  contents: read
+jobs:
+  package-installer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare signed client versions
+        run: |
+          curl -fLsS --retry 3 'https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.29-winter-graphics/RUSSIA-RP-1.7.29-Winter-Graphics.apk' -o previous.apk
+          python3 -m venv "$RUNNER_TEMP/restore"
+          "$RUNNER_TEMP/restore/bin/pip" install bsdiff4==1.4.4
+          "$RUNNER_TEMP/restore/bin/python" winter/2027/qa/restore_release.py previous.apk winter/2027/release/1.7.30 30 candidate.apk
+          sudo setfacl -m u:"$(id -un)":rw /dev/kvm
+      - name: Exercise Files on the Google APIs Android 16 image
+        uses: reactivecircus/android-emulator-runner@b530d96654c385303d652368551fb075bc2f0b6b
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: |
+            adb shell getprop ro.build.version.sdk
+            adb shell getprop ro.product.cpu.abilist
+            adb shell getconf PAGE_SIZE
+            adb install --no-streaming candidate.apk
+            adb uninstall com.russiarp.winter27.lights
+            python3 winter/2027/qa/install_from_downloads.py previous.apk 1.7.29
+            python3 winter/2027/qa/install_from_downloads.py candidate.apk 1.7.30
+            adb uninstall com.russiarp.winter27.lights
+            python3 winter/2027/qa/install_from_downloads.py candidate.apk 1.7.30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android16-google-installer
+          path: evidence/
