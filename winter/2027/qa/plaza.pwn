@@ -48,7 +48,7 @@ stock PlateCamera(p,vehicleid,bool:front) {
     GetVehiclePos(vehicleid,x,y,z);GetVehicleZAngle(vehicleid,angle);
     new Float:side=front?1.0:-1.0;
     new Float:dx=-floatsin(angle,degrees)*side,Float:dy=floatcos(angle,degrees)*side;
-    Camera(p,x+dx*5.65,y+dy*5.65,z+.34,x+dx*2.05,y+dy*2.05,z-.21);
+    Camera(p,x+dx*5.65,y+dy*5.65,z+0.34,x+dx*2.05,y+dy*2.05,z-0.21);
 }
 stock ShowPlate(playerid,vehicleid,const number[],const region[]) {
     // Stock SA-MP sets a single text string. The Moscow client receives a typed
