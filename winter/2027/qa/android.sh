@@ -41,6 +41,17 @@ if test "$EDITION" = winter; then
   env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk --preview --r8 recorder/r8.jar
   app=unsigned.apk
   pkg=com.russiarp.snow
+elif test "$EDITION" = standalone; then
+  pkg=com.russiarp.winter27
+  app="$RUNNER_TEMP/RUSSIA-RP-1.7.24-Winter-Weik.apk"
+  apksigner verify --verbose "$app"
+  adb install -g baseline.apk
+  adb install -g "$app"
+  adb shell pm path com.russiarp.hudx | grep -q 'base.apk'
+  adb shell pm path "$pkg" | grep -q 'base.apk'
+  echo 'Both signed APKs installed alongside each other' >evidence/coexistence.txt
+  # Instrumentation needs the same test certificate as its target on the disposable device.
+  adb uninstall "$pkg"
 fi
 # Stage the same install that the production launcher verifies. Only the local test host differs.
 python3 "$src/qa/stage.py" Weik baseline.apk cache20.zip
@@ -93,10 +104,12 @@ adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb push Weik/. "/sdcard/$root/" >push.log
-if test "$EDITION" = winter; then
+if [[ "$EDITION" = winter || "$EDITION" = standalone ]]; then
   adb shell am instrument -w com.russiarp.qa.capture/com.russiarp.qa.CacheUpgrade >evidence/cache-upgrade.txt 2>&1
   cat evidence/cache-upgrade.txt
   grep -Fq 'verified offline, zero archive requests' evidence/cache-upgrade.txt
+  adb shell test -d /sdcard/Weik/texdb
+  adb shell test ! -e /sdcard/RWin
 fi
 adb logcat -c
 # Launch the real native activity with the loopback settings already written.

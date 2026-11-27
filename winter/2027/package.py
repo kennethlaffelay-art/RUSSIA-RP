@@ -19,7 +19,7 @@ def once(source,old,new):
     if source.count(old)!=1:raise ValueError('Unexpected integration point '+old[:70])
     return source.replace(old,new)
 
-def edit_dex(project,meta,manifest,preview):
+def edit_dex(project,meta,manifest,preview,preview_id):
     pkg='Lblackrussia/online/'
     cat=pkg+'WinterCatalog;'
     root=project/'smali_classes6/blackrussia/online'
@@ -79,7 +79,7 @@ def edit_dex(project,meta,manifest,preview):
     path.write_text(s)
     conf=project/'smali_classes3/com/wn/blackrussia/BuildConfig.smali'
     s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x30'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.24"')
-    if preview:s=s.replace('com.russiarp.hudx','com.russiarp.snow')
+    if preview:s=s.replace('com.russiarp.hudx',preview_id)
     conf.write_text(s)
     if preview:
         smali=project/'smali/blackrussia/online'
@@ -107,7 +107,9 @@ def edit_dex(project,meta,manifest,preview):
 """+anchor)
         path.write_text(s)
 
-def package(base,assets,apktool,out,preview,r8=None):
+def package(base,assets,apktool,out,preview,r8=None,standalone=False):
+    preview = preview or standalone
+    preview_id = 'com.russiarp.winter27' if standalone else 'com.russiarp.snow'
     if hashlib.sha256(base.read_bytes()).hexdigest()!='a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1':raise ValueError('Requires 1.7.22')
     meta=json.loads((assets/'integration.json').read_bytes())
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp,ZipFile(base) as z:
@@ -118,14 +120,16 @@ def package(base,assets,apktool,out,preview,r8=None):
         def run(*args):
             subprocess.run(['java','-Xmx2g','-Djava.io.tmpdir='+str(tmp),'-jar',str(apktool.resolve()),*map(str,args)],check=True)
         run('d','-r','-j','2',mini,'-o',project)
-        edit_dex(project,meta,json.loads(z.read('assets/json/weik-cache.json'))['files'],preview)
+        edit_dex(project,meta,json.loads(z.read('assets/json/weik-cache.json'))['files'],preview,preview_id)
         run('b','-j','2',project,'-o',built)
         doc=Doc(z.read('AndroidManifest.xml'));root=doc.elements()[0]
         assert root.get('versionCode')==46
         root.set('versionCode',16,48);root.set('versionName',3,doc.pool.add('1.7.24'))
         if preview:
-            doc.pool.values=[s.replace('com.russiarp.hudx','com.russiarp.snow') for s in doc.pool.values]
-            app=next(e for e in doc.elements() if e.tag=='application');app.set('label',3,doc.pool.add('RUSSIA RP · Зима'))
+            doc.pool.values=[s.replace('com.russiarp.hudx',preview_id) for s in doc.pool.values]
+            app=next(e for e in doc.elements() if e.tag=='application')
+            label = 'RUSSIA RP · Зима 2027' if standalone else 'RUSSIA RP · Зима'
+            app.set('label',3,doc.pool.add(label))
         files={p.relative_to(assets).as_posix():p for p in (assets/'assets').rglob('*') if p.is_file()}
         if preview:
             if r8 is None or hashlib.sha256(r8.read_bytes()).hexdigest()!='900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199':
@@ -193,4 +197,5 @@ if __name__=='__main__':
     for name in ('base','assets','apktool','out'):parser.add_argument(name,type=Path)
     parser.add_argument('--r8',type=Path)
     parser.add_argument('--preview',action='store_true')
+    parser.add_argument('--standalone', action='store_true', help='Build the independently signed winter client alongside either earlier package.')
     package(**vars(parser.parse_args()))

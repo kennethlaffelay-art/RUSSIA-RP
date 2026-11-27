@@ -1,0 +1,83 @@
+name: Verify and publish standalone winter Android client
+on:
+  push:
+    branches: [release/winter-1.7.24-weik]
+    paths: ['.github/workflows/preview-winter-weik.yml', 'winter/2027/**']
+permissions:
+  contents: read
+env:
+  APK_NAME: RUSSIA-RP-1.7.24-Winter-Weik.apk
+  TAG_NAME: russia-rp-v1.7.24-winter-weik
+  APK_SHA256: f4b7c000f567e8087da6f25d5414e657d80376a27e7a082b9253ceaec72b44fa
+jobs:
+  verify:
+    if: github.repository == 'kennethlaffelay-art/RUSSIA-RP'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the signed release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$APK_NAME"
+          else
+            # The initial transfer is kept outside the source history. Once published, use the verified release asset.
+            api="repos/$GITHUB_REPOSITORY/git"
+            tree=1ccd2cfe776b0aa6acb5237d1d699a8b86f7e4a9
+            mkdir parts
+            gh api "$api/trees/$tree" --jq '.tree | sort_by(.path)[] | [.path,.sha] | @tsv' > parts.tsv
+            test "$(wc -l < parts.tsv)" -eq 49
+            while read -r part sha; do
+              [[ "$part" =~ ^part\.[0-9]{3}$ && "$sha" =~ ^[0-9a-f]{40}$ ]]
+              gh api -H 'Accept: application/vnd.github.raw+json' "$api/blobs/$sha" > "parts/$part"
+            done < parts.tsv
+            cat parts/part.* > client.zst
+            echo '18ee3e679cdcf07a791db9bbc830ea7e1517cfd9321aac1220a759ca96728f44  client.zst' | sha256sum -c -
+            gh release download russia-rp-v1.7.22-preview --repo "$GITHUB_REPOSITORY" --pattern 'RUSSIA-RP-1.7.22.apk'
+            echo 'a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1  RUSSIA-RP-1.7.22.apk' | sha256sum -c -
+            zstd -qd --long=27 --patch-from=RUSSIA-RP-1.7.22.apk client.zst -o "$APK_NAME"
+          fi
+          echo "$APK_SHA256  $APK_NAME" | sha256sum -c -
+      - name: Check coexistence, offline upgrade and game startup on Android ARM64
+        env:
+          EDITION: standalone
+        run: bash winter/2027/qa/android.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: winter-weik-evidence
+          path: ${{ runner.temp }}/winter/evidence/
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-apk
+          path: ${{ runner.temp }}/${{ env.APK_NAME }}
+          compression-level: 0
+          retention-days: 7
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-apk
+      - name: Publish the checked APK as a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$APK_SHA256  $APK_NAME" | sha256sum -c -
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG_NAME" |
+              jq -e --arg name "$APK_NAME" --arg digest "sha256:$APK_SHA256" '.prerelease and any(.assets[]; .name==$name and .digest==$digest)'
+            exit 0
+          fi
+          gh release create "$TAG_NAME" "$APK_NAME" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "RUSSIA RP 1.7.24 · Зима 2027" \
+            --notes "Отдельная зимняя сборка для Android. Устанавливается рядом с предыдущим клиентом. Использует готовый игровой кеш в папке Weik. При первом запуске разрешите доступ к файлам для проверки кеша и применения зимних ресурсов. Если файлы отсутствуют или повреждены, установщик может догрузить их. Идентификатор приложения: com.russiarp.winter27."
