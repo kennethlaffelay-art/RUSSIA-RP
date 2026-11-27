@@ -1,0 +1,23 @@
+name: Winter 1.7.25 headlight check
+on:
+  push:
+    branches: [release/winter-1.7.25-headlights]
+    paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml']
+permissions:
+  contents: read
+jobs:
+  headlights:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upgrade the 1.7.24 cache and capture headlights on Android
+        env:
+          EDITION: headlights
+        run: bash winter/2027/qa/android.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: headlights-evidence
+          path: ${{ runner.temp }}/winter/evidence/
+          if-no-files-found: ignore

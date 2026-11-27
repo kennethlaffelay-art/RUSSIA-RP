@@ -78,7 +78,7 @@ def edit_dex(project,meta,manifest,preview,preview_id):
 '''+target)
     path.write_text(s)
     conf=project/'smali_classes3/com/wn/blackrussia/BuildConfig.smali'
-    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x30'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.24"')
+    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x31'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.25"')
     if preview:s=s.replace('com.russiarp.hudx',preview_id)
     conf.write_text(s)
     if preview:
@@ -124,7 +124,7 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
         run('b','-j','2',project,'-o',built)
         doc=Doc(z.read('AndroidManifest.xml'));root=doc.elements()[0]
         assert root.get('versionCode')==46
-        root.set('versionCode',16,48);root.set('versionName',3,doc.pool.add('1.7.24'))
+        root.set('versionCode',16,49);root.set('versionName',3,doc.pool.add('1.7.25'))
         if preview:
             doc.pool.values=[s.replace('com.russiarp.hudx',preview_id) for s in doc.pool.values]
             app=next(e for e in doc.elements() if e.tag=='application')
@@ -142,37 +142,8 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
             files['classes9.dex']=classes/'classes.dex'
         with ZipFile(built) as compiled,ZipFile(out,'w',allowZip64=False) as result:
             edits={'AndroidManifest.xml':doc.encode(),**{n:compiled.read(n) for n in dexfiles}}
-            # Constants belong to DoHeadLightBeam only. Increase the minimum angular
-            # visibility of each existing beam. The vehicle keeps its dummy, switch and tint.
-            for abi,edits_at in {
-                'arm64-v8a':[(0x1b24e4,'01902e1e','01502f1e'),(0x1b24e8,'0856a852','0846a852'),
-                             (0x1b2670,'f5e30039','ffe30039'),(0x1b269c,'f5e70039','ffe70039')],
-                'armeabi-v7a':[(0x123bd0,'b7ee044a','b7ee0a4a'),(0x123df4,'0000b042','00003042'),
-                               (0x123cf8,'8df84420','8df84460'),(0x123cfc,'8df84320','8df84360')]
-            }.items():
-                n=f'lib/{abi}/libmultiplayer.so';raw=bytearray(z.read(n))
-                for at,old,new in edits_at:
-                    before=bytes.fromhex(old)
-                    if raw[at:at+len(before)]!=before:raise ValueError('Unknown headlamp renderer '+abi)
-                    raw[at:at+len(before)]=bytes.fromhex(new)
-                edits[n]=raw
-            # The base engine also draws its own five-vertex cone. Use source-over
-            # blending and a single luminous centre so two cones cannot add up to
-            # a solid white polygon on snow. Keep the original dummies, projection,
-            # switch, render-state restoration and view-independent world size.
-            stock_beams={
-                'arm64-v8a':[(0x6b48a4,'e1031f32','e1071f32'),(0x6b49a4,'29590011','89078052'),
-                             (0x6b49d4,'0b1800b9','081800b9'),(0x6b49d8,'0b3c00b9','083c00b9')],
-                'armeabi-v7a':[(0x59088a,'0221','0621'),(0x590a40,'13ee102a','4ff03c02'),
-                               (0x590a70,'8261','8361'),(0x590a72,'c263','c363')]
-            }
-            for abi,replacements in stock_beams.items():
-                n=f'lib/{abi}/libGame.so';data=bytearray(z.read(n))
-                for at,expected,replacement in replacements:
-                    old=bytes.fromhex(expected)
-                    if data[at:at+len(old)]!=old:raise ValueError('Unknown native light geometry '+abi)
-                    data[at:at+len(old)]=bytes.fromhex(replacement)
-                edits[n]=data
+            # Inherit both light renderers from the 1.7.22 base. Its per-lamp
+            # geometry, vertex alpha and blend modes are the 1.7.21 implementation.
             def put(name,raw,method):
                 info=ZipInfo(name,(2026,1,1,0,0,0));info.compress_type=method
                 if method==ZIP_STORED:

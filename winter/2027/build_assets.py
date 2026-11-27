@@ -246,7 +246,11 @@ def build(apkfile,channel,root,out,fontfile):
                 while buf:=stream.read(1048576):expected.update(buf)
             finalhash=expected.hexdigest();files[n]=[finalhash,*source[1:]]
             sample_off,sample_data=new[0]
-            metadata['delta'][n]={'hash':finalhash,'source':source,'at':sample_off+16,'sample':sample_data[16:40].hex()}
+            # The two lamp revisions share transparent blocks at the start of both
+            # records. Sample inside the beam so 1.7.24 is actually upgraded.
+            sample_index = len(sample_data) // 2 if n.startswith('texdb/txd/') else 16
+            metadata['delta'][n]={'hash':finalhash,'source':source,'at':sample_off+sample_index,
+                                  'sample':sample_data[sample_index:sample_index+24].hex()}
             save('assets/weik-defaults/'+n+'.patch',serialise_patch(sz,total))
         save('assets/json/weik-cache.json',json.dumps(manifest,separators=(',',':')).encode())
         save('assets/russia/plate.ttf',change_font(apk.read('assets/russia/plate.ttf')))

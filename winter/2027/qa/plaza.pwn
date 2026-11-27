@@ -88,6 +88,17 @@ public Frame(p,step) {
         case 14: {SetPlayerTime(p,22,0);PlateCamera(p,carA,false);}
         case 15: {SetPlayerTime(p,13,0);PlateCamera(p,carB,true);}
         case 16: {SetPlayerTime(p,12,30);SetPlayerPos(p,845.5,-2334.0,38.9);Camera(p,847.0,-2329.0,39.38,853.4,-2277.0,38.05);}
+        // A fixed front three-quarter view at dusk, with the same camera for off/on.
+        case 17: {
+            SetPlayerPos(p,719.0,-2342.0,37.4);SetPlayerTime(p,19,0);
+            SetVehiclePos(carA,714.0,-2343.0,37.15);SetVehicleZAngle(carA,0.0);
+            SetVehicleParamsEx(carB,0,0,0,0,0,0,0);
+            for(new i;i<4;i++)SetVehicleParamsEx(extraCars[i],0,0,0,0,0,0,0);
+            SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
+            Camera(p,710.7,-2335.6,38.45,714.0,-2342.4,37.20);
+        }
+        case 18: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 19: SetVehicleZAngle(carA,32.0);
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);

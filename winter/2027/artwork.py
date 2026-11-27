@@ -71,22 +71,38 @@ def pine(original):
     return Image.fromarray(p)
 
 def headlamp(original, name):
-    w,h=original.size
-    yy,xx=np.mgrid[:h,:w];x=(xx+.5)/w*2-1
-    depth=1-(yy+.5)/h
-    # The near end of each UV is at the bottom. The stock twin projection has two origins.
-    origins=(-.34,.34) if name=='headlight' else (0.,)
-    light=np.zeros_like(x)
-    for origin in origins:
-        axis=origin*(1+.12*depth)
-        beam=np.exp(-((x-axis)/(.105+.49*depth))**2*1.3)*(1-depth)**.68
-        light=np.maximum(light,beam)
-    light*=np.clip((1-depth)/.13,0,1)
-    colors=np.stack([np.uint8(np.clip(light,0,1)**.84*c) for c in [245,245,239]],axis=2)
-    im=Image.fromarray(colors).convert('RGBA')
-    if name=='headlight':
-        im.putalpha(Image.fromarray(np.uint8(236*np.clip(light,0,1)**.92)))
-    return im
+    width, height = original.size
+    rows, columns = np.mgrid[:height, :width]
+    x = 2 * (columns + 0.5) / width - 1
+    distance = 1 - (rows + 0.5) / height
+
+    # The renderer projects either one lamp or a pair across the vehicle width.
+    # Both masks use the bottom edge as the bumper and widen towards the road.
+    paired = name == 'headlight'
+    half_width = (0.036 + 0.35 * distance) if paired else (0.055 + 0.77 * distance)
+    centres = (-0.43, 0.43) if paired else (0.0,)
+    profile = np.zeros_like(x)
+    for centre in centres:
+        cross_section = np.abs(x - centre * (1 + 0.09 * distance)) / half_width
+        edge = np.clip((1 - cross_section) / 0.27, 0, 1)
+        feather = edge * edge * (3 - 2 * edge)
+        core = 1 - 0.24 * np.minimum(cross_section, 1) ** 2
+        profile = np.maximum(profile, feather * core)
+
+    # Keep pavement visible close to the bumper and roll off the far edge.
+    fade = np.clip((1 - distance) / 0.26, 0, 1)
+    light = profile * (0.86 - 0.23 * distance) * fade * fade * (3 - 2 * fade)
+    tint = np.array([255, 244, 216])
+    if paired:
+        # Split energy across RGB and alpha for a smooth edge in either blend mode.
+        rgb = np.sqrt(light)[:, :, None] * tint
+        alpha = np.sqrt(light) * 225
+    else:
+        # This texture uses DXT1. Its black background is the additive neutral value.
+        rgb = light[:, :, None] * tint
+        alpha = np.full_like(light, 255)
+    pixels = np.dstack((rgb, alpha)).round().astype(np.uint8)
+    return Image.fromarray(pixels)
 
 def halo(original):
     h,w=original.height,original.width

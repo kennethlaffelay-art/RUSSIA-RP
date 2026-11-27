@@ -31,16 +31,21 @@ root=Weik
 app=baseline.apk
 mkdir -p recorder
 fetch https://storage.googleapis.com/r8-releases/raw/8.3.37/r8.jar recorder/r8.jar
-if test "$EDITION" = winter; then
+if [[ "$EDITION" = winter || "$EDITION" = headlights ]]; then
   git clone -q https://github.com/Parik27/DragonFF.git dragon
   git -C dragon checkout -q 319847f7803f102c5aa31fa38e8b3284117db40a
   python3 -m venv env
   env/bin/pip -q install 'Pillow==12.2.0' numpy scipy fonttools
   fetch https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar apktool.jar
   PYTHONPATH=dragon env/bin/python "$src/build_assets.py" baseline.apk cache20.zip Weik assets-out /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
-  env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk --preview --r8 recorder/r8.jar
-  app=unsigned.apk
+  mode=--preview
   pkg=com.russiarp.snow
+  if test "$EDITION" = headlights; then
+    mode=--standalone
+    pkg=com.russiarp.winter27
+  fi
+  env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk "$mode" --r8 recorder/r8.jar
+  app=unsigned.apk
 elif test "$EDITION" = standalone; then
   pkg=com.russiarp.winter27
   app="$RUNNER_TEMP/RUSSIA-RP-1.7.24-Winter-Weik.apk"
@@ -54,7 +59,13 @@ elif test "$EDITION" = standalone; then
   adb uninstall "$pkg"
 fi
 # Stage the same install that the production launcher verifies. Only the local test host differs.
-python3 "$src/qa/stage.py" Weik baseline.apk cache20.zip
+previous=baseline.apk
+if test "$EDITION" = headlights; then
+  previous=winter-1724.apk
+  fetch "$origin/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" "$previous"
+  echo "f4b7c000f567e8087da6f25d5414e657d80376a27e7a082b9253ceaec72b44fa  $previous" | sha256sum -c -
+fi
+python3 "$src/qa/stage.py" Weik "$previous" cache20.zip
 keytool -genkeypair -keystore qa.p12 -storetype PKCS12 -storepass android-test -keyalg RSA -keysize 2048 -alias qa -dname 'CN=Isolated Android QA' -validity 5
 apksigner sign --ks qa.p12 --ks-pass pass:android-test --out client-qa.apk "$app"
 mkdir -p recorder/classes recorder/dex
@@ -104,7 +115,7 @@ adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb push Weik/. "/sdcard/$root/" >push.log
-if [[ "$EDITION" = winter || "$EDITION" = standalone ]]; then
+if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights ]]; then
   adb shell am instrument -w com.russiarp.qa.capture/com.russiarp.qa.CacheUpgrade >evidence/cache-upgrade.txt 2>&1
   cat evidence/cache-upgrade.txt
   grep -Fq 'verified offline, zero archive requests' evidence/cache-upgrade.txt
@@ -163,5 +174,5 @@ done
 adb logcat -b crash -d >evidence/crash.txt
 adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || true
 grep -q 'RRP QA END' evidence/server.txt
-test "${#seen[@]}" = 17
+test "${#seen[@]}" = 20
 test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7
