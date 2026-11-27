@@ -1,0 +1,50 @@
+package com.russiarp.inventory;
+import java.util.HashMap;
+final class WeaponModels {
+    static final HashMap<String,Integer> IDS=new HashMap<>();
+    static {
+        IDS.put("Кастет", 331);
+        IDS.put("Клюшка для гольфа", 333);
+        IDS.put("Дубинка", 334);
+        IDS.put("Нож", 335);
+        IDS.put("Бита", 336);
+        IDS.put("Лопата", 337);
+        IDS.put("Кий", 338);
+        IDS.put("Катана", 339);
+        IDS.put("Бензопила", 341);
+        IDS.put("Фиолетовый дилдо", 321);
+        IDS.put("Дилдо", 322);
+        IDS.put("Вибратор", 323);
+        IDS.put("Серебряный вибратор", 324);
+        IDS.put("Цветы", 325);
+        IDS.put("Топор", 326);
+        IDS.put("Граната", 342);
+        IDS.put("Дымовая граната", 343);
+        IDS.put("Коктейль молотова", 344);
+        IDS.put("Пистолет", 346);
+        IDS.put("Пистолет с глушителем", 347);
+        IDS.put("Пустынный орёл", 348);
+        IDS.put("Дробовик", 349);
+        IDS.put("Обрез", 350);
+        IDS.put("Тактический дробовик", 351);
+        IDS.put("Micro-Uzi", 352);
+        IDS.put("MP5", 353);
+        IDS.put("AK-47", 355);
+        IDS.put("M4", 356);
+        IDS.put("TEC-9", 372);
+        IDS.put("Винтовка", 357);
+        IDS.put("Снайперская винтовка", 358);
+        IDS.put("РПГ", 359);
+        IDS.put("Самонаводящаяся установка", 360);
+        IDS.put("Огнемет", 361);
+        IDS.put("Миниган", 362);
+        IDS.put("C4", 363);
+        IDS.put("Кнопка детонатора", 364);
+        IDS.put("Баллончик", 365);
+        IDS.put("Огнетушитель", 366);
+        IDS.put("Фотоаппарат", 367);
+        IDS.put("Очки ночного видения", 368);
+        IDS.put("Очки с тепловизором", 369);
+        IDS.put("Парашют", 371);
+    }
+}

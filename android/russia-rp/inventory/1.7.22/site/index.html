@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'"><title>Инвентарь · Россия</title><style>/*STYLE*/</style></head>
+<body><main id="screen">
+<header><div class="heading"><span data-icon="bag"></span><h1>ИНВЕНТАРЬ</h1></div><div class="wallet"><span class="rub">₽</span><strong id="cash"></strong><button id="plus" aria-label="Магазин доната" data-icon="plus"></button><button id="close" aria-label="Закрыть инвентарь" data-icon="close"></button></div></header>
+<section class="identity"><span class="avatar" data-icon="profile"></span><div><h2 id="name"></h2><p id="profile"></p></div></section>
+<nav id="rail" aria-label="Разделы"></nav>
+<div class="equipment" aria-label="Экипировка" id="gear"></div><div class="weapons" aria-label="Слоты оружия" id="weapons"></div>
+<img id="character" hidden alt="Персонаж игрока">
+<div class="circles"><button id="backpack" aria-label="Перейти к предметам" data-icon="bag"></button><button id="eat" aria-label="Съесть закуску" data-icon="food"></button></div>
+<section class="bag"><div class="baghead"><h2>Инвентарь</h2><span id="weight" hidden></span></div>
+<div class="well"><div class="scroll" id="scroll" tabindex="0" aria-label="Содержимое инвентаря"><div id="grid" role="group" aria-label="Предметы и ячейки"></div></div><div class="track" id="track" aria-hidden="true"><i></i></div></div></section>
+<div id="backdrop" hidden></div><aside id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetName" hidden><button class="sheetclose" id="cancel" aria-label="Назад" data-icon="close"></button><h2 id="sheetName"></h2><p id="note"></p><div id="actions"></div></aside>
+<div id="toast" role="status" hidden></div>
+</main><script type="application/json" id="snapshot">__GAME_DATA__</script><script>/*ART*/</script><script>/*ICONS*/</script><script>/*APP*/</script></body></html>

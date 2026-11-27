@@ -1,0 +1,40 @@
+name: Publish Moscow inventory and HUD preview
+on:
+  push:
+    branches: [release/moscow-client-1.7.22]
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: github.repository == 'kennethlaffelay-art/RUSSIA-RP'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - name: Restore and verify the signed Android client
+        env:
+          ASSET_PATH: android/russia-rp/inventory/1.7.22
+        run: |
+          set -euo pipefail
+          source="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/$ASSET_PATH"
+          for name in dictionary.py recipe.json client.zst.00 client.zst.01 client.zst.02 client.zst.03 client.zst.04 inventory-preview.jpg inventory-vip-preview.jpg hud-preview.png; do
+            curl -fsSL --retry 3 "$source/$name" -o "$name"
+          done
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.21-preview/RUSSIA-RP-1.7.21.apk" -o previous.apk
+          echo 'bec00e29f534b09a33085606727459b41eaf93724a4c34a28fab7dbabd5e9ceb  previous.apk' | sha256sum -c -
+          python3 dictionary.py previous.apk recipe.json dictionary
+          cat client.zst.00 client.zst.01 client.zst.02 client.zst.03 client.zst.04 > client.zst
+          zstd -dq --long=27 --patch-from=dictionary client.zst -o RUSSIA-RP-1.7.22.apk
+          echo 'a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1  RUSSIA-RP-1.7.22.apk' | sha256sum -c -
+      - name: Publish the signed preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=russia-rp-v1.7.22-preview
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" | jq -e '.prerelease and any(.assets[]; .name=="RUSSIA-RP-1.7.22.apk" and .digest=="sha256:a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1")'
+            exit
+          fi
+          gh release create "$tag" RUSSIA-RP-1.7.22.apk inventory-preview.jpg inventory-vip-preview.jpg hud-preview.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false --title "RUSSIA RP 1.7.22 — инвентарь и HUD «Москвы»" --notes "Тестовое обновление Android поверх 1.7.21. Открывайте инвентарь через меню или /inv. Предметы и четыре VIP-ячейки теперь в одной прокручиваемой сетке. Экипировка и оружие вынесены в отдельные слоты. Для модели персонажа используется текущий ID одежды. Вес показывается только при наличии данных сервера. В HUD логотип, Москва и множитель выровнены по нижнему краю. Приложенные изображения иллюстрируют интерфейс на тестовых данных."
