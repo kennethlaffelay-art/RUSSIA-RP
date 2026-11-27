@@ -29,6 +29,8 @@ rm world.zip
 pkg=com.russiarp.hudx
 root=Weik
 app=baseline.apk
+mkdir -p recorder
+fetch https://storage.googleapis.com/r8-releases/raw/8.3.37/r8.jar recorder/r8.jar
 if test "$EDITION" = winter; then
   git clone -q https://github.com/Parik27/DragonFF.git dragon
   git -C dragon checkout -q 319847f7803f102c5aa31fa38e8b3284117db40a
@@ -36,26 +38,25 @@ if test "$EDITION" = winter; then
   env/bin/pip -q install 'Pillow==12.2.0' numpy scipy fonttools
   fetch https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar apktool.jar
   PYTHONPATH=dragon env/bin/python "$src/build_assets.py" baseline.apk cache20.zip Weik assets-out /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
-  env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk --preview
+  env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk --preview --r8 recorder/r8.jar
   app=unsigned.apk
   pkg=com.russiarp.snow
-  root=RWin
 fi
 # Stage the same install that the production launcher verifies. Only the local test host differs.
-python3 "$src/qa/stage.py" Weik "$app" cache20.zip
+python3 "$src/qa/stage.py" Weik baseline.apk cache20.zip
 keytool -genkeypair -keystore qa.p12 -storetype PKCS12 -storepass android-test -keyalg RSA -keysize 2048 -alias qa -dname 'CN=Isolated Android QA' -validity 5
 apksigner sign --ks qa.p12 --ks-pass pass:android-test --out client-qa.apk "$app"
 mkdir -p recorder/classes recorder/dex
 fetch https://raw.githubusercontent.com/Sable/android-platforms/1e98db1a199e8f7f85541af26bfc27019501b132/android-31/android.jar recorder/android.jar
-fetch https://storage.googleapis.com/r8-releases/raw/8.3.37/r8.jar recorder/r8.jar
 echo 'd53c940da56e816deb259c3b43b667b43d82d8615029ee10fa5bff641ef0123d  recorder/android.jar' | sha256sum -c -
 echo '900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199  recorder/r8.jar' | sha256sum -c -
-javac -source 8 -target 8 -classpath recorder/android.jar -d recorder/classes "$src/qa/WorldCapture.java"
+javac -source 8 -target 8 -classpath recorder/android.jar -d recorder/classes "$src/qa/WorldCapture.java" "$src/qa/CacheUpgrade.java"
 java -cp recorder/r8.jar com.android.tools.r8.D8 --min-api 26 --lib recorder/android.jar --output recorder/dex recorder/classes/com/russiarp/qa/*.class
 cat >recorder/AndroidManifest.xml <<XML
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.russiarp.qa.capture">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="28"/>
   <application android:label="World capture"/>
+  <instrumentation android:name="com.russiarp.qa.CacheUpgrade" android:targetPackage="$pkg"/>
   <instrumentation android:name="com.russiarp.qa.WorldCapture" android:targetPackage="$pkg"/>
 </manifest>
 XML
@@ -92,6 +93,11 @@ adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb push Weik/. "/sdcard/$root/" >push.log
+if test "$EDITION" = winter; then
+  adb shell am instrument -w com.russiarp.qa.capture/com.russiarp.qa.CacheUpgrade >evidence/cache-upgrade.txt 2>&1
+  cat evidence/cache-upgrade.txt
+  grep -Fq 'verified offline, zero archive requests' evidence/cache-upgrade.txt
+fi
 adb logcat -c
 # Launch the real native activity with the loopback settings already written.
 record_dir="/sdcard/Android/data/$pkg/files"

@@ -78,34 +78,36 @@ def edit_dex(project,meta,manifest,preview):
 '''+target)
     path.write_text(s)
     conf=project/'smali_classes3/com/wn/blackrussia/BuildConfig.smali'
-    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x2f'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.23"')
+    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x30'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.24"')
     if preview:s=s.replace('com.russiarp.hudx','com.russiarp.snow')
     conf.write_text(s)
     if preview:
-        p=project/'smali/com/joom/paranoid/Deobfuscator$wn$Debug.smali'
-        s=p.read_text()
-        target='    move-result-object p0\n\n    return-object p0'
-        # Scope path changes to local game directories, retaining archive member names and URLs.
-        s=once(s,target,'''    move-result-object p0
-    const-string v0, "/Weik"
-    invoke-virtual {p0, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
-    move-result p1
-    if-eqz p1, :winter_path_prefix
-    const-string p0, "/RWin"
-    return-object p0
-    :winter_path_prefix
-    const-string v0, "/Weik/"
-    invoke-virtual {p0, v0}, Ljava/lang/String;->startsWith(Ljava/lang/String;)Z
-    move-result p1
-    if-eqz p1, :winter_path_done
-    const-string p1, "/RWin/"
-    invoke-virtual {p0, v0, p1}, Ljava/lang/String;->replace(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;
-    move-result-object p0
-    :winter_path_done
-    return-object p0''')
-        p.write_text(s)
+        smali=project/'smali/blackrussia/online'
+        path=smali/'Settings.smali';s=path.read_text()
+        anchor='    sput-object v0, Lblackrussia/online/Settings;->GAME_PATH:Ljava/lang/String;'
+        path.write_text(once(s,anchor,anchor+"""
+    new-instance v1, Ljava/io/File;
+    invoke-direct {v1, v0}, Ljava/io/File;-><init>(Ljava/lang/String;)V
+    invoke-static {v1}, Lblackrussia/online/SharedCache;->adopt(Ljava/io/File;)V"""))
+        path=smali/'WeikCache.smali';s=path.read_text()
+        anchor='    iput-object p1, p0, Lblackrussia/online/WeikCache;->root:Ljava/io/File;'
+        s=once(s,anchor,anchor+'\n    invoke-static {p1}, Lblackrussia/online/SharedCache;->adopt(Ljava/io/File;)V')
+        anchor='    invoke-static {v0, v2}, Lblackrussia/online/CacheUpdates;->worker('
+        s=once(s,anchor,"""    iget-object v3, v0, Lblackrussia/online/WeikCache;->root:Ljava/io/File;
+    invoke-direct {v0, v1}, Lblackrussia/online/WeikCache;->destination(Ljava/lang/String;)Ljava/io/File;
+    move-result-object v4
+    move-object v5, v1
+    iget-wide v6, v2, Lblackrussia/online/WeikCache$Entry;->size:J
+    iget-object v8, v2, Lblackrussia/online/WeikCache$Entry;->hash:Ljava/lang/String;
+    invoke-static/range {v3 .. v8}, Lblackrussia/online/SharedCache;->reuse(Ljava/io/File;Ljava/io/File;Ljava/lang/String;JLjava/lang/String;)Z
+    move-result v3
+    if-eqz v3, :shared_cache_continue
+    return-void
+    :shared_cache_continue
+"""+anchor)
+        path.write_text(s)
 
-def package(base,assets,apktool,out,preview):
+def package(base,assets,apktool,out,preview,r8=None):
     if hashlib.sha256(base.read_bytes()).hexdigest()!='a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1':raise ValueError('Requires 1.7.22')
     meta=json.loads((assets/'integration.json').read_bytes())
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp,ZipFile(base) as z:
@@ -120,11 +122,20 @@ def package(base,assets,apktool,out,preview):
         run('b','-j','2',project,'-o',built)
         doc=Doc(z.read('AndroidManifest.xml'));root=doc.elements()[0]
         assert root.get('versionCode')==46
-        root.set('versionCode',16,47);root.set('versionName',3,doc.pool.add('1.7.23'))
+        root.set('versionCode',16,48);root.set('versionName',3,doc.pool.add('1.7.24'))
         if preview:
             doc.pool.values=[s.replace('com.russiarp.hudx','com.russiarp.snow') for s in doc.pool.values]
             app=next(e for e in doc.elements() if e.tag=='application');app.set('label',3,doc.pool.add('RUSSIA RP · Зима'))
         files={p.relative_to(assets).as_posix():p for p in (assets/'assets').rglob('*') if p.is_file()}
+        if preview:
+            if r8 is None or hashlib.sha256(r8.read_bytes()).hexdigest()!='900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199':
+                raise ValueError('Preview requires the pinned R8 8.3.37 jar')
+            classes=tmp/'shared-cache';classes.mkdir()
+            helper=Path(__file__).resolve().with_name('SharedCache.java')
+            subprocess.run(['javac','--release','8','-d',str(classes),str(helper)],check=True)
+            subprocess.run(['java','-cp',str(r8.resolve()),'com.android.tools.r8.D8','--min-api','26','--output',str(classes),str(classes/'blackrussia/online/SharedCache.class')],check=True)
+            assert 'classes9.dex' not in z.namelist()
+            files['classes9.dex']=classes/'classes.dex'
         with ZipFile(built) as compiled,ZipFile(out,'w',allowZip64=False) as result:
             edits={'AndroidManifest.xml':doc.encode(),**{n:compiled.read(n) for n in dexfiles}}
             # Constants belong to DoHeadLightBeam only. Increase the minimum angular
@@ -140,10 +151,6 @@ def package(base,assets,apktool,out,preview):
                     before=bytes.fromhex(old)
                     if raw[at:at+len(before)]!=before:raise ValueError('Unknown headlamp renderer '+abi)
                     raw[at:at+len(before)]=bytes.fromhex(new)
-                if preview:
-                    old=b'/storage/emulated/0/Weik/\0'
-                    if raw.count(old)!=1:raise ValueError('Unknown native game path')
-                    raw=raw.replace(old,b'/storage/emulated/0/RWin/\0')
                 edits[n]=raw
             # The base engine also draws its own five-vertex cone. Use source-over
             # blending and a single luminous centre so two cones cannot add up to
@@ -184,5 +191,6 @@ def package(base,assets,apktool,out,preview):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('base','assets','apktool','out'):parser.add_argument(name,type=Path)
+    parser.add_argument('--r8',type=Path)
     parser.add_argument('--preview',action='store_true')
     package(**vars(parser.parse_args()))
