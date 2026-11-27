@@ -1,0 +1,50 @@
+name: Android 16 installation from Downloads
+on:
+  push:
+    branches: [release/winter-1.7.30-vehicles]
+    paths: ['.github/workflows/winter-android16.yml', 'winter/2027/qa/install_from_downloads.py']
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Android 16 ARM64
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y adb
+          if ! sudo modprobe binder_linux; then
+            sudo apt-get -qq install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe binder_linux
+          fi
+          docker run --name phone --privileged -d -p 127.0.0.1:5555:5555 redroid/redroid@sha256:0d774872e66ba99306c3e21172b251485bbb794cfb8f8e754add99d3e75f050e androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest androidboot.redroid_width=800 androidboot.redroid_height=1000
+          for n in $(seq 1 100); do
+            adb connect 127.0.0.1:5555 >/dev/null || true
+            if test "$(timeout 4 adb shell getprop sys.boot_completed | tr -d '\r')" = 1; then break; fi
+            sleep 2
+          done
+          test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = 36
+          adb shell getprop ro.product.cpu.abilist
+          adb shell getconf PAGE_SIZE
+      - name: Check the published APK via the package manager and Downloads
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 'https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.29-winter-graphics/RUSSIA-RP-1.7.29-Winter-Graphics.apk' -o previous.apk
+          echo 'd8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9  previous.apk' | sha256sum -c -
+          adb install --no-streaming previous.apk
+          adb uninstall com.russiarp.winter27.lights
+          python3 winter/2027/qa/install_from_downloads.py previous.apk 1.7.29
+      - name: Collect package manager results
+        if: always()
+        run: |
+          mkdir -p evidence
+          adb logcat -d -s PackageManager PackageInstaller PackageInstallerSession AndroidRuntime > evidence/installer.log || true
+          adb exec-out screencap -p > evidence/installer.png || true
+          docker logs phone --tail 100 > evidence/boot.txt 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android16-installation
+          path: evidence/
