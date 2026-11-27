@@ -4,6 +4,7 @@ import random
 import numpy as np
 from gtaLib import dff as rw, col
 from resources import img_index
+from plaza_detail import material,branch_crown,wheel_structure
 
 WOOD=(106,65,44); TRIM=(68,47,39); GOLD=(211,164,78); SNOW=(196,205,211)
 RED=(159,52,47); WARM=(255,213,148); WIRE=(53,65,60); ICE=(144,173,187)
@@ -14,17 +15,25 @@ class Mesh:
         self.night=[]
         self.boxes=[]
         self.fx=[]
-    def face(self,points,color,glow=False):
+        self.slots={}
+    def face(self,points,color,glow=False,tex=None,uv=None):
         p=np.array(points,dtype=float)
         normal=np.cross(p[1]-p[0],p[2]-p[0]);normal/=np.linalg.norm(normal)
         g=self.geo;start=len(g.vertices)
+        slot=material(self,color,glow,tex)
+        if not g.uv_layers:g.uv_layers=[[]]
+        if uv is None:
+            ax=int(np.argmax(abs(normal)))
+            u,v=(1,2) if ax==0 else (0,2) if ax==1 else (0,1)
+            uv=[(point[u]*.43,-point[v]*.43) for point in p]
+        g.uv_layers[0].extend(rw.TexCoords(*coord) for coord in uv)
         g.vertices.extend(rw.Vector(*v) for v in p)
         g.normals.extend([rw.Vector(*normal)]*len(p))
         g.prelit_colors.extend([rw.RGBA(*color,255)]*len(p))
         tone=color if glow else tuple(round(c*f) for c,f in zip(color,(.42,.50,.66)))
         self.night.extend([rw.RGBA(*tone,255)]*len(p))
         for j in range(1,len(p)-1):
-            g.triangles.append(rw.Triangle(start+j,start,0,start+j+1))
+            g.triangles.append(rw.Triangle(start+j,start,slot,start+j+1))
     def box(self,low,high,color,solid=False,glow=False):
         x,y,z=low;X,Y,Z=high
         if solid:self.boxes.append((low,high))
@@ -60,8 +69,9 @@ class Mesh:
         g=self.geo;arr=np.array(g.vertices)
         mid=(arr.max(0)+arr.min(0))*.5
         g.bounding_sphere=rw.Sphere(*mid,np.linalg.norm(arr-mid,axis=1).max()+.02)
-        material=rw.Material();material.color=rw.RGBA(255,255,255,255);material.surface_properties=rw.GeomSurfPro(1.,0.,.72)
-        g.materials=[material]
+        if not g.materials:
+            default=rw.Material();default.color=rw.RGBA(255,255,255,255);default.surface_properties=rw.GeomSurfPro(.78,0.,.5)
+            g.materials=[default]
         g.extensions['extra_vert_color']=rw.ExtraVertColorExtension(self.night)
         f=rw.Frame();f.name=self.name;f.position=rw.Vector(0,0,0);f.rotation_matrix=rw.Matrix(*(rw.Vector(*v) for v in np.eye(3)))
         a=rw.Atomic();a.flags=5
@@ -128,6 +138,7 @@ def rink():
 
 def tree_trim():
     m=Mesh('rrp_firtop')
+    branch_crown(m)
     for i in range(108):
         t=i/108;theta=math.tau*(4.7*t+.12);r=3.30*(1-t)**.87+.10
         p=(r*math.cos(theta),r*math.sin(theta),1.0+10.9*t)
@@ -148,6 +159,7 @@ def tree_trim():
 
 def wheel_trim():
     m=Mesh('rrp_wheelight')
+    wheel_structure(m)
     for i in range(80):
         a=math.tau*i/80
         for y in (-1.77,1.77):
@@ -198,10 +210,8 @@ def layout(year):
     def add(mid,name,x,y,dz=0,angle=0):
         places.append((mid,name,x,y,z+dz,angle))
     # East-west access on the original bridge alignment stays clear.
-    add(19076,'XmasTree1',719,-2313);add(ids['rrp_firtop'],'rrp_firtop',719,-2313)
+    add(ids['rrp_firtop'],'rrp_firtop',719,-2313)
     add(ids['rrp_season'],'rrp_season',719,-2319)
-    for i,(x,y) in enumerate([(716.5,-2314),(718,-2315.7),(721.2,-2314.2),(717,-2311)]):
-        add(19054+i,'XmasBox'+str(i+1),x,y,.66,15+i*17)
     for x,y,angle in [(700,-2317,-90),(700,-2326,-90),(737,-2326,90),(737,-2317,90)]:
         add(ids['rrp_chalet'],'rrp_chalet',x,y,0,angle)
     add(ids['rrp_rink'],'rrp_rink',721,-2286)
@@ -212,11 +222,7 @@ def layout(year):
     for x,y in [(707,-2296),(735,-2296),(708,-2332),(733,-2332)]:
         add(1223,'lampost_coast',x,y,-.012)
     wx,wy=721,-2263
-    for mid,name in [(18877,'FerrisWheelBit'),(18878,'FerrisBaseBit'),(ids['rrp_wheelight'],'rrp_wheelight')]:
-        add(mid,name,wx,wy,16.23)
-    for i in range(10):
-        a=i*math.tau/10
-        add(18879,'FerrisCageBit',wx+11.72*math.cos(a),wy,16.23+11.72*math.sin(a))
+    add(ids['rrp_wheelight'],'rrp_wheelight',wx,wy,16.23)
     for x,y,a in [(696,-2330,10),(697,-2310,76),(740,-2327,113),(710,-2276,25),(734,-2281,60),(706,-2266,15)]:
         add(ids['rrp_snowbank'],'rrp_snowbank',x,y,0,a)
     return meshes,ids,places

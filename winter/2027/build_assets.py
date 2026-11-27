@@ -13,10 +13,11 @@ from fontTools.ttLib import TTFont
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.transformPen import TransformPen
 from resources import *
-from artwork import plate,woodlands,pine,headlamp,halo,snow_surface
+from artwork import plate,woodlands,pine,headlamp,halo,snow_surface,ground_snow
 from lighting import timecycle,colorcycle,winter_sky
 from plaza import layout
 from snow import flurries
+from gtaLib import col
 
 APK_SHA='a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1'
 CACHE_SHA='aec496b553b3528483d9dea231440bc861a9c910588d99de20c67b0b5afbbe5c'
@@ -101,6 +102,7 @@ def texture_updates(root,apk,fontfile):
     changes={}
     deciduous={'buktree1','buktree2','r_dub1','r_berez1_b','r_berez1_t','r_listv1','vyhl_listv1','vyhl_listv2','newtreeleavesb128','treecron9716','treecron9716_2','auctreecrone8712'}
     surfaces={'new_ryazan_lesdirt_rd','brusch_3','ind_road_crossing','road_blank256hv','pzu_road_03','dt_road','antey_roof1','antey_roof2','bat_bank_krysha','bazar01krish','izbaroof1','otb_rooftile1','otb_rooftile2','rooftar01_e','sad_krysha','sjm_metalroof1','ruscount_grass'}
+    open_ground={'new_ryazan_les','oldgrs2_bld_citygrass','grass_128hv','ruscount_grass'}
     for db in ('gta_int','loader_car','txd','samp'):
         cat=Textures(root,db);path='texdb/'+db+'/'+db+'.dxt.'
         thumbs=(root/(path+'tmb')).read_bytes();lookup=[];pos=0
@@ -113,7 +115,7 @@ def texture_updates(root,apk,fontfile):
         previous=[]
         if db=='gta_int':
             _,previous=patch_ranges(apk.read('assets/weik-defaults/'+path+'dat.patch'))
-            names+=sorted(surfaces.intersection(cat.ids))
+            names+=sorted((surfaces|open_ground).intersection(cat.ids))
             names+=sorted(n for n in cat.ids if n in deciduous or re.fullmatch(r'lodbuktree\d+_a889|pinebranch1',n))
         for n in names:
             if db=='samp':
@@ -129,6 +131,7 @@ def texture_updates(root,apk,fontfile):
             elif n in ('headlight','headlight1'):img=headlamp(t.image(),n)
             elif n=='coronaheadlightline':img=halo(t.image())
             elif n in ('pinebranch1','pinelo128'):img=pine(t.image())
+            elif n in open_ground:img=ground_snow(t.image())
             elif n in surfaces:
                 current=bytearray(t.source);touched=False
                 for pos,data in previous:
@@ -153,6 +156,27 @@ def texture_updates(root,apk,fontfile):
             print(db,n,t.size,flush=True)
     return changes
 
+def plaza_ground(stream,idx):
+    start,capacity=idx['rip8.col']
+    stream.seek(start);raw=stream.read(capacity)
+    offset=0;chunks=[];found=False
+    while raw[offset:offset+3]==b'COL':
+        size=8+struct.unpack_from('<I',raw,offset+4)[0]
+        chunk=raw[offset:offset+size]
+        if chunk[8:30].split(b'\0')[0].lower()==b'hln_ter2':
+            c=col.coll();c.load_memory(chunk);m=c.models[0]
+            # This stock mesh is flat here but its collision triangles stop outside the fair.
+            # Coordinates come from the actual map7_stream instance and rendered triangles.
+            pos=(745.5414428710938,-2383.38623046875,34.962520599365234)
+            a=tuple(v-o for v,o in zip((691.,-2353.,36.10),pos))
+            b=tuple(v-o for v,o in zip((744.,-2248.,36.37),pos))
+            m.boxes.append(col.TBox(col.TVector(*a),col.TVector(*b),col.TSurface(0,0,0,0x76)))
+            chunk=c.write_memory();found=True
+        chunks.append(chunk);offset+=size
+    out=b''.join(chunks)
+    if not found or any(raw[offset:]) or len(out)>capacity:raise ValueError('Unexpected map7 collision bank')
+    return start,out.ljust(capacity,b'\0')
+
 def build(apkfile,channel,root,out,fontfile):
     if digest(apkfile.read_bytes())!=APK_SHA or digest(channel.read_bytes())!=CACHE_SHA:raise ValueError('Version mismatch')
     out.mkdir(parents=True,exist_ok=True)
@@ -171,9 +195,10 @@ def build(apkfile,channel,root,out,fontfile):
             if n=='data/colorcycle.dat':raw=colorcycle(raw)
             locals_[n]=raw
         patches=texture_updates(root,apk,fontfile)
-        with (root/'texdb/gta_int.img').open('rb') as f:idx=img_index(f)
+        with (root/'texdb/gta_int.img').open('rb') as f:
+            idx=img_index(f);floor=plaza_ground(f,idx)
         pos,size=idx['fakesnow1.dff']
-        patches['texdb/gta_int.img']=[(pos,snow.ljust(size,b'\0'))]
+        patches['texdb/gta_int.img']=[(pos,snow.ljust(size,b'\0')),floor]
         metadata={'bundled':{},'delta':{}}
         def save(n,data):
             p=out/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)

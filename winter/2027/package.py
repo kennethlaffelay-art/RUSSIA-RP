@@ -118,8 +118,8 @@ def package(base,assets,apktool,out,preview):
             # Constants belong to DoHeadLightBeam only. Increase the minimum angular
             # visibility of each existing beam. The vehicle keeps its dummy, switch and tint.
             for abi,edits_at in {
-                'arm64-v8a':[(0x1b24e4,'01902e1e','01502f1e'),(0x1b24e8,'0856a852','085aa852')],
-                'armeabi-v7a':[(0x123bd0,'b7ee044a','b7ee0a4a'),(0x123df4,'0000b042','0000d042')]
+                'arm64-v8a':[(0x1b24e4,'01902e1e','01502f1e'),(0x1b24e8,'0856a852','0846a852')],
+                'armeabi-v7a':[(0x123bd0,'b7ee044a','b7ee0a4a'),(0x123df4,'0000b042','00003042')]
             }.items():
                 n=f'lib/{abi}/libmultiplayer.so';raw=bytearray(z.read(n))
                 for at,old,new in edits_at:

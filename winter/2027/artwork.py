@@ -103,3 +103,11 @@ def snow_surface(original):
     adjusted=rgb*(1-.085*high[:,:,None]) + np.dstack((-1.4*high,0*high,1.7*high))
     p[:,:,:3]=np.clip(adjusted,0,255).astype(np.uint8)
     return Image.fromarray(p)
+
+def ground_snow(original):
+    p=np.asarray(original).copy()
+    rgb=p[:,:,:3].astype(float);luma=rgb@np.array([.28,.52,.20])
+    detail=luma-np.mean(luma)
+    surface=np.clip(177+detail*.31,128,204)
+    p[:,:,:3]=np.stack([surface*.967,surface*.989,surface*1.01],axis=2).astype(np.uint8)
+    return Image.fromarray(p)
