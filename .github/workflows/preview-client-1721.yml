@@ -1,0 +1,39 @@
+name: Publish Moscow plates and headlights preview
+on:
+  push:
+    branches: [release/moscow-client-1.7.21]
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: github.repository == 'kennethlaffelay-art/RUSSIA-RP'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - name: Restore and verify the signed Android client
+        env:
+          ASSET_PATH: android/russia-rp/vehicles/1.7.21
+        run: |
+          set -euo pipefail
+          source="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/$ASSET_PATH"
+          for name in dictionary.py recipe.json client.zst plate-preview.png; do
+            curl -fsSL --retry 3 "$source/$name" -o "$name"
+          done
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.20-preview/RUSSIA-RP-1.7.20.apk" -o previous.apk
+          echo 'f8269ad0a5cafdb99203b4cef07718cfba764641823269f5d622dfd535ee4613  previous.apk' | sha256sum -c -
+          python3 dictionary.py previous.apk recipe.json dictionary
+          zstd -dq --long=27 --patch-from=dictionary client.zst -o RUSSIA-RP-1.7.21.apk
+          echo 'bec00e29f534b09a33085606727459b41eaf93724a4c34a28fab7dbabd5e9ceb  RUSSIA-RP-1.7.21.apk' | sha256sum -c -
+      - name: Publish the signed preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=russia-rp-v1.7.21-preview
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" | jq -e '.prerelease and any(.assets[]; .name=="RUSSIA-RP-1.7.21.apk" and .digest=="sha256:bec00e29f534b09a33085606727459b41eaf93724a4c34a28fab7dbabd5e9ceb")'
+            exit
+          fi
+          gh release create "$tag" RUSSIA-RP-1.7.21.apk plate-preview.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false --title "RUSSIA RP 1.7.21 — номера и свет фар" --notes "Тестовая сборка Android для сервера «Москва». На российских номерах обновлены буквы, цифры, рамка и поле региона. Два луча передних фар стали длиннее и шире, свет заметнее при взгляде спереди. Установите APK поверх 1.7.20 и запустите клиент. Совместимый кеш обновится по частям. На изображении показана текстура номера с двумя примерами комбинаций."
