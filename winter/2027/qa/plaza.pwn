@@ -153,7 +153,7 @@ public Frame(p,step) {
         }
         case 35: {
             new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
-            Camera(p,x-5.8,y+.9,z+.72,x,y,z+.05);
+            Camera(p,x-5.8,y+0.9,z+0.72,x,y,z+0.05);
         }
         case 36: {SetPlayerTime(p,20,0);SetPlayerWeather(p,8);}
         case 37: SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
