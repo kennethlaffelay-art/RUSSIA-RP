@@ -1,0 +1,43 @@
+name: Publish Moscow client 1.7.19 preview
+on:
+  push:
+    branches: [release/moscow-client-1.7.19]
+    paths:
+      - 'android/russia-rp/client-update/release/1.7.19/**'
+      - '.github/workflows/preview-client-1719.yml'
+permissions:
+  contents: read
+jobs:
+  preview:
+    if: github.repository == 'kennethlaffelay-art/RUSSIA-RP'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Restore and check signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/android/russia-rp/client-update/release"
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.18/RUSSIA-RP-1.7.18.apk" -o base.apk
+          echo '833571e51ceca05a32cb2d8f53c720fa00c6c94187a353632bc2d359e62e105a  base.apk' | sha256sum -c -
+          curl -fsSL --retry 3 "$prefix/1.7.18/dictionary.py" -o dictionary.py
+          for name in dex-edits.json preview.zst RUSSIA-RP-1.7.19-markers.zip RUSSIA-RP-1.7.19-preview.png; do
+            curl -fsSL --retry 3 "$prefix/1.7.19/$name" -o "$name"
+          done
+          python3 dictionary.py base.apk dex-edits.json dictionary
+          zstd -qd --long=27 --patch-from=dictionary preview.zst -o RUSSIA-RP-1.7.19.apk
+          echo '9133b446d86ef7e38d32c73a9b75d2f809259162973abbd9cace088738425768  RUSSIA-RP-1.7.19.apk' | sha256sum -c -
+      - name: Publish the preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=russia-rp-v1.7.19-preview
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" | jq -e '.prerelease and any(.assets[]; .name=="RUSSIA-RP-1.7.19.apk" and .digest=="sha256:9133b446d86ef7e38d32c73a9b75d2f809259162973abbd9cace088738425768")'
+            exit
+          fi
+          gh release create "$tag" RUSSIA-RP-1.7.19.apk RUSSIA-RP-1.7.19-preview.png RUSSIA-RP-1.7.19-markers.zip --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false --title "RUSSIA RP 1.7.19 — номера и метки Москвы" --notes "Тестовый клиент сервера «Москва». Устанавливается поверх 1.7.18. Обновлены шрифт номерных знаков и 16 игровых меток. Приложены образцы и комплект графики."
