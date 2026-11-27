@@ -43,6 +43,13 @@ public SettleCars(p,phase) {
 stock Camera(p,Float:x,Float:y,Float:z,Float:tx,Float:ty,Float:tz) {
     SetPlayerCameraPos(p,x,y,z);SetPlayerCameraLookAt(p,tx,ty,tz);
 }
+stock PlateCamera(p,vehicleid,bool:front) {
+    new Float:x,Float:y,Float:z,Float:angle;
+    GetVehiclePos(vehicleid,x,y,z);GetVehicleZAngle(vehicleid,angle);
+    new Float:side=front?1.0:-1.0;
+    new Float:dx=-floatsin(angle,degrees)*side,Float:dy=floatcos(angle,degrees)*side;
+    Camera(p,x+dx*5.65,y+dy*5.65,z+.34,x+dx*2.05,y+dy*2.05,z-.21);
+}
 stock ShowPlate(playerid,vehicleid,const number[],const region[]) {
     // Stock SA-MP sets a single text string. The Moscow client receives a typed
     // registration and its region separately when the vehicle is streamed in.
@@ -67,8 +74,8 @@ public Frame(p,step) {
         case 5: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
         case 6: {SetVehicleZAngle(carA,55.0);SetVehiclePos(carA,717.0,-2342.00,37.1);}
         case 7: {SetVehicleToRespawn(carA);SetVehicleParamsEx(carA,0,0,0,0,0,0,0);}
-        case 8: {SetPlayerTime(p,13,0);Camera(p,714.0,-2339.10,37.12,714.0,-2340.75,36.91);}
-        case 9: Camera(p,724.0,-2347.10,37.14,724.0,-2345.10,36.98);
+        case 8: {SetPlayerTime(p,13,0);PlateCamera(p,carA,true);}
+        case 9: PlateCamera(p,carB,false);
         case 10: {SetPlayerPos(p,712.0,-2323.0,37.40);SetPlayerTime(p,18,0);Camera(p,718.0,-2328.0,38.0,718.0,-2320.0,38.0);snow[0]=CreatePlayerObject(p,18864,718.0,-2324.0,39.0,0.0,0.0,0.0,40.0);}
         case 11: {for(new i=1;i<5;i++)snow[i]=CreatePlayerObject(p,18864,716.0+i,-2324.0+i,38.0+i*0.6,0.0,0.0,i*17.0,40.0);}
         case 12: {
@@ -78,9 +85,9 @@ public Frame(p,step) {
             Camera(p,706.0,-2331.00,41.5,714.0,-2345.00,37.0);
         }
         case 13: {SetPlayerTime(p,13,0);Camera(p,717.0,-2335.00,38.2,714.0,-2343.00,37.2);}
-        case 14: {SetPlayerTime(p,22,0);Camera(p,714.0,-2347.10,37.14,714.0,-2345.10,36.98);}
-        case 15: {SetPlayerTime(p,13,0);Camera(p,724.0,-2339.10,37.12,724.0,-2340.75,36.91);}
-        case 16: {SetPlayerTime(p,12,30);SetPlayerPos(p,848.0,-2310.0,38.8);Camera(p,848.0,-2308.5,39.35,845.0,-2333.0,38.4);}
+        case 14: {SetPlayerTime(p,22,0);PlateCamera(p,carA,false);}
+        case 15: {SetPlayerTime(p,13,0);PlateCamera(p,carB,true);}
+        case 16: {SetPlayerTime(p,12,30);SetPlayerPos(p,845.5,-2334.0,38.9);Camera(p,847.0,-2329.0,39.38,853.4,-2277.0,38.05);}
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);
