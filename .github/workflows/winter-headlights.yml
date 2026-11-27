@@ -1,30 +1,31 @@
-name: Winter 1.7.29 materials and headlights
+name: Winter 1.7.30 vehicle materials and Android 16
 on:
   push:
-    branches: [release/winter-1.7.29-rendering]
-    paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml']
+    branches: [release/winter-1.7.30-vehicles]
+    paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml', '.github/workflows/winter-android16.yml']
 permissions:
   contents: read
 env:
-  APK: RUSSIA-RP-1.7.29-Winter-Graphics.apk
-  SHA256: d8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9
+  APK: RUSSIA-RP-1.7.30-Winter-Vehicles.apk
+  SHA256: ac2b0163930ffc700f9f98c73425a7f98377babb4f51fae172298b3f2525141c
 jobs:
+  android16:
+    uses: ./.github/workflows/winter-android16.yml
   headlights:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Restore the signed 1.7.29 candidate
+      - name: Restore the signed 1.7.30 candidate
         working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.26-winter-lights/RUSSIA-RP-1.7.26-Winter-Lights.apk" -o base26.apk
-          echo '0f2e331762b6ee69b22918f609efda48c5d287528727622919d9826cacf39ec4  base26.apk' | sha256sum -c -
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.29-winter-graphics/RUSSIA-RP-1.7.29-Winter-Graphics.apk" -o previous.apk
+          echo 'd8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9  previous.apk' | sha256sum -c -
           python3 -m venv "$RUNNER_TEMP/restore-env"
           "$RUNNER_TEMP/restore-env/bin/pip" install bsdiff4==1.4.4
           src="$GITHUB_WORKSPACE/winter/2027"
-          "$RUNNER_TEMP/restore-env/bin/python" "$src/qa/restore_release.py" base26.apk "$src/release/1.7.29" 28 previous.apk
-          "$RUNNER_TEMP/restore-env/bin/python" "$src/qa/restore_release.py" base26.apk "$src/release/1.7.29" 29 "$APK"
+          "$RUNNER_TEMP/restore-env/bin/python" "$src/qa/restore_release.py" previous.apk "$src/release/1.7.30" 30 "$APK"
           echo "$SHA256  $APK" | sha256sum -c -
       - name: Exercise both native lamp meshes on ARM64 and ARMv7
         run: |
@@ -48,7 +49,7 @@ jobs:
           compression-level: 0
           retention-days: 7
   publish:
-    needs: headlights
+    needs: [headlights, android16]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -63,7 +64,7 @@ jobs:
       - name: Publish Android client and in-game comparison
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: russia-rp-v1.7.29-winter-graphics
+          TAG: russia-rp-v1.7.30-winter-vehicles
         run: |
           set -euo pipefail
           echo "$SHA256  $APK" | sha256sum -c -
@@ -88,5 +89,5 @@ jobs:
           cp evidence/world-17.png lights-off.png
           cp evidence/world-18.png lights-on.png
           gh release create "$TAG" "$APK" lights-off.png lights-on.png asphalt-off.png asphalt-on.png headlamp-closeup.png snow-rear.png snow-side.png snow-front.png clear-coat.png side-light.png wet-road.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "RUSSIA RP 1.7.29 · Зима 2027 · Графика" \
-            --notes "Отражение на лаке зависит от угла взгляда. Блики огней на мокрой дороге получили мягкие края. Обновлены тени машин, мотоциклов и пешеходов, а также освещение в разную погоду. Устанавливается поверх 1.7.28."
+            --title "RUSSIA RP 1.7.30 · Зима 2027 · Автомобили" \
+            --notes "Новые материалы кузова и хрома, мягкое ядро блика, сохранение прозрачности стекла. Проверены чистая установка и обновление с 1.7.29 через системный установщик Android 16 ARM64."

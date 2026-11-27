@@ -1,8 +1,8 @@
 name: Android 16 installation from Downloads
 on:
-  push:
-    branches: [release/winter-1.7.30-vehicles]
-    paths: ['.github/workflows/winter-android16.yml', 'winter/2027/qa/install_from_downloads.py']
+  workflow_call:
+env:
+  ANDROID_SERIAL: 127.0.0.1:5555
 permissions:
   contents: read
 jobs:
@@ -27,15 +27,21 @@ jobs:
           done
           test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = 36
           adb shell getprop ro.product.cpu.abilist
-          adb shell getconf PAGE_SIZE
+          adb shell getconf PAGE_SIZE || adb shell getconf PAGESIZE
       - name: Check the published APK via the package manager and Downloads
         run: |
           set -euo pipefail
           curl -fLsS --retry 3 'https://github.com/kennethlaffelay-art/RUSSIA-RP/releases/download/russia-rp-v1.7.29-winter-graphics/RUSSIA-RP-1.7.29-Winter-Graphics.apk' -o previous.apk
           echo 'd8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9  previous.apk' | sha256sum -c -
-          adb install --no-streaming previous.apk
+          python3 -m venv "$RUNNER_TEMP/restore"
+          "$RUNNER_TEMP/restore/bin/pip" install bsdiff4==1.4.4
+          "$RUNNER_TEMP/restore/bin/python" winter/2027/qa/restore_release.py previous.apk winter/2027/release/1.7.30 30 candidate.apk
+          adb install --no-streaming candidate.apk
           adb uninstall com.russiarp.winter27.lights
           python3 winter/2027/qa/install_from_downloads.py previous.apk 1.7.29
+          python3 winter/2027/qa/install_from_downloads.py candidate.apk 1.7.30
+          adb uninstall com.russiarp.winter27.lights
+          python3 winter/2027/qa/install_from_downloads.py candidate.apk 1.7.30
       - name: Collect package manager results
         if: always()
         run: |

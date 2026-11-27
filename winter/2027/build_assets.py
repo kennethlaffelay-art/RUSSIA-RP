@@ -13,6 +13,7 @@ from fontTools.ttLib import TTFont
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.transformPen import TransformPen
 from resources import *
+from car_surfaces import apply_vehicle_maps
 from artwork import plate,woodlands,pine,headlamp,halo,snow_surface,ground_snow
 from materials import shadow_mask, wet_highlight, weather_lighting
 from lighting import timecycle,colorcycle,winter_sky
@@ -339,6 +340,7 @@ def build(apkfile,channel,root,out,fontfile,previous=None):
                     save(member, content)
                     row.update(size=len(content), sample=content[row['at']:row['at']+24].hex())
                 save('assets/russia/plate.ttf',release.read('assets/russia/plate.ttf'))
+        apply_vehicle_maps(root,out,files,metadata)
         save('assets/json/weik-cache.json',json.dumps(manifest,separators=(',',':')).encode())
         save('integration.json',json.dumps(metadata,indent=2).encode())
 if __name__=='__main__':build(*map(Path,sys.argv[1:]))

@@ -42,7 +42,7 @@ if test "$EDITION" = winter; then
   app=unsigned.apk
   pkg=com.russiarp.snow
 elif test "$EDITION" = headlights; then
-  app="$RUNNER_TEMP/RUSSIA-RP-1.7.29-Winter-Graphics.apk"
+  app="$RUNNER_TEMP/RUSSIA-RP-1.7.30-Winter-Vehicles.apk"
   pkg=com.russiarp.winter27.lights
   fetch "$origin/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" winter-1724.apk
   apksigner verify --verbose "$app"
@@ -50,8 +50,8 @@ elif test "$EDITION" = headlights; then
   adb install -g "$RUNNER_TEMP/previous.apk"
   adb install -r -g "$app"
   adb shell pm path com.russiarp.winter27 | grep -q 'base.apk'
-  adb shell dumpsys package "$pkg" | grep -F 'versionName=1.7.29'
-  echo 'Upgraded Lights 1.7.28 alongside Winter Weik 1.7.24' >evidence/coexistence.txt
+  adb shell dumpsys package "$pkg" | grep -F 'versionName=1.7.30'
+  echo 'Upgraded Graphics 1.7.29 alongside Winter Weik 1.7.24' >evidence/coexistence.txt
   adb uninstall "$pkg"
 elif test "$EDITION" = standalone; then
   pkg=com.russiarp.winter27
@@ -69,7 +69,7 @@ fi
 previous=baseline.apk
 if test "$EDITION" = headlights; then
   previous="$RUNNER_TEMP/previous.apk"
-  echo "ef08cda482db9e15bb3ba0824f70aefd9422e150b1b81b321523cc005b83109b  $previous" | sha256sum -c -
+  echo "d8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9  $previous" | sha256sum -c -
 fi
 python3 "$src/qa/stage.py" Weik "$previous" cache20.zip
 keytool -genkeypair -keystore qa.p12 -storetype PKCS12 -storepass android-test -keyalg RSA -keysize 2048 -alias qa -dname 'CN=Isolated Android QA' -validity 5
@@ -126,7 +126,7 @@ if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights 
   cat evidence/cache-upgrade.txt
   grep -Fq 'verified offline, zero archive requests' evidence/cache-upgrade.txt
   if test "$EDITION" = headlights; then
-    for file in texdb/txd/txd.dxt.dat texdb/txd/txd.dxt.tmb models/particle.txd data/timecyc.dat data/ctimecy.dat; do
+    for file in texdb/{txd/txd,gta_int/gta_int,loader_car/loader_car}.dxt.{dat,tmb}; do
       expected=$(unzip -p "$app" assets/json/weik-cache.json | jq -r --arg file "$file" '.files[$file][0]')
       actual=$(adb shell sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
       test "$expected" = "$actual"

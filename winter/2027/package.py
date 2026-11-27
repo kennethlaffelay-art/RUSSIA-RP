@@ -79,7 +79,7 @@ def edit_dex(project,meta,manifest,preview,preview_id):
 '''+target)
     path.write_text(s)
     conf=project/'smali_classes3/com/wn/blackrussia/BuildConfig.smali'
-    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x35'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.29"')
+    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x36'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.30"')
     if preview:s=s.replace('com.russiarp.hudx',preview_id)
     conf.write_text(s)
     if preview:
@@ -205,7 +205,7 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
         run('b','-j','2',project,'-o',built)
         doc=Doc(z.read('AndroidManifest.xml'));root=doc.elements()[0]
         assert root.get('versionCode')==46
-        root.set('versionCode',16,53);root.set('versionName',3,doc.pool.add('1.7.29'))
+        root.set('versionCode',16,54);root.set('versionName',3,doc.pool.add('1.7.30'))
         if preview:
             doc.pool.values=[s.replace('com.russiarp.hudx',preview_id) for s in doc.pool.values]
             app=next(e for e in doc.elements() if e.tag=='application')
@@ -229,7 +229,7 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
                     renderer = headlight_renderer(z.read(path), library, abi)
                     renderer = vehicle_material(renderer, library)
                     if library == 'libmultiplayer.so':
-                        renderer = once(renderer, b'RUSSIA RP 1.7.22%.0s', b'RUSSIA RP 1.7.29%.0s')
+                        renderer = once(renderer, b'RUSSIA RP 1.7.22%.0s', b'RUSSIA RP 1.7.30%.0s')
                     edits[path] = renderer
             def put(name,raw,method):
                 info=ZipInfo(name,(2026,1,1,0,0,0));info.compress_type=method
