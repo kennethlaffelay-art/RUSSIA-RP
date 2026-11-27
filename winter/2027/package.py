@@ -145,6 +145,23 @@ def package(base,assets,apktool,out,preview):
                     if raw.count(old)!=1:raise ValueError('Unknown native game path')
                     raw=raw.replace(old,b'/storage/emulated/0/RWin/\0')
                 edits[n]=raw
+            # The base engine also draws its own five-vertex cone. Use source-over
+            # blending and a single luminous centre so two cones cannot add up to
+            # a solid white polygon on snow. Keep the original dummies, projection,
+            # switch, render-state restoration and view-independent world size.
+            stock_beams={
+                'arm64-v8a':[(0x6b48a4,'e1031f32','e1071f32'),(0x6b49a4,'29590011','89078052'),
+                             (0x6b49d4,'0b1800b9','081800b9'),(0x6b49d8,'0b3c00b9','083c00b9')],
+                'armeabi-v7a':[(0x59088a,'0221','0621'),(0x590a40,'13ee102a','4ff03c02'),
+                               (0x590a70,'8261','8361'),(0x590a72,'c263','c363')]
+            }
+            for abi,replacements in stock_beams.items():
+                n=f'lib/{abi}/libGame.so';data=bytearray(z.read(n))
+                for at,expected,replacement in replacements:
+                    old=bytes.fromhex(expected)
+                    if data[at:at+len(old)]!=old:raise ValueError('Unknown native light geometry '+abi)
+                    data[at:at+len(old)]=bytes.fromhex(replacement)
+                edits[n]=data
             def put(name,raw,method):
                 info=ZipInfo(name,(2026,1,1,0,0,0));info.compress_type=method
                 if method==ZIP_STORED:
