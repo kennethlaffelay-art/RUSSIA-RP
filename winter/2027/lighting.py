@@ -2,6 +2,29 @@
 import re
 import numpy as np
 SLOTS=8
+def winter_sky(raw, phase):
+    from io import BytesIO
+    from PIL import Image
+    image=Image.open(BytesIO(raw)).convert('RGB')
+    pixels=np.array(image)
+    for y in range(0,image.height,128):
+        strip=pixels[y:y+128].astype(np.float32)
+        red,green,blue=np.moveaxis(strip,-1,0)
+        cool=np.maximum(blue-red,0)
+        if phase=='Rasv':
+            red+=.31*cool
+            green-=.18*np.maximum(green-red,0)
+        elif phase=='Day':
+            red+=.1*cool
+            green-=.055*np.maximum(green-red,0)
+        else:
+            red+=.14*cool
+            green-=.09*np.maximum(green-red,0)
+        strip-=.09*np.maximum(strip-190,0)
+        pixels[y:y+128]=np.clip(np.rint(strip),0,255).astype(np.uint8)
+    out=BytesIO();Image.fromarray(pixels).save(out,format='PNG')
+    return out.getvalue()
+
 def timecycle(raw):
     weather=None
     result=[]

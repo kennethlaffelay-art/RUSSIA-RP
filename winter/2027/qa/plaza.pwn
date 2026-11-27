@@ -10,7 +10,7 @@ public OnGameModeInit() {
     AddPlayerClass(60,719.0,-2325.0,37.45,0.0,WEAPON_FIST,0,WEAPON_FIST,0,WEAPON_FIST,0);
     carA=CreateVehicle(411,714.0,-2325.0,37.15,0.0,0,0,-1);
     carB=CreateVehicle(445,724.0,-2325.0,37.15,0.0,1,1,-1);
-    SetVehicleNumberPlate(carA,"A518MP");SetVehicleNumberPlate(carB,"T204KK");
+    SetVehicleNumberPlate(carA,"A518MP77");SetVehicleNumberPlate(carB,"T204KK197");
     for(new i;i<4;i++)extraCars[i]=CreateVehicle(445,704.0+4.0*i,-2335.0,37.15,0.0,5,5,-1);
     return 1;
 }
@@ -50,9 +50,13 @@ public Frame(p,step) {
             for(new i;i<4;i++)SetVehicleParamsEx(extraCars[i],1,1,0,0,0,0,0);
             Camera(p,706.0,-2313.0,41.5,714.0,-2327.0,37.0);
         }
+        case 13: {SetPlayerTime(p,13,0);Camera(p,717.0,-2317.0,38.2,714.0,-2325.0,37.2);}
+        case 14: {SetPlayerTime(p,22,0);Camera(p,714.0,-2328.65,36.97,714.0,-2325.0,36.98);}
+        case 15: {SetPlayerTime(p,13,0);Camera(p,724.0,-2321.4,36.99,724.0,-2325.0,36.98);}
+        case 16: {SetPlayerTime(p,12,30);Camera(p,733.0,-2302.0,38.1,675.0,-2302.0,37.4);}
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);
-    SetTimerEx("Frame",6500,false,"ii",p,step+1);
+    SetTimerEx("Frame",8500,false,"ii",p,step+1);
     return 1;
 }

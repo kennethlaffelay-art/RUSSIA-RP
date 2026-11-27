@@ -14,7 +14,7 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.transformPen import TransformPen
 from resources import *
 from artwork import plate,woodlands,pine,headlamp,halo,snow_surface
-from lighting import timecycle,colorcycle
+from lighting import timecycle,colorcycle,winter_sky
 from plaza import layout
 from snow import flurries
 
@@ -140,7 +140,11 @@ def texture_updates(root,apk,fontfile):
                 img=snow_surface(t.image())
             else:img=woodlands(t.image(),n)
             try:encoded=t.encode(img)
-            except ValueError:encoded=t.encode(img,keep_runs=True)
+            except ValueError:
+                if n in ('headlight','headlight1'):
+                    encoded=t.encode(img,block_span=2)
+                else:
+                    encoded=t.encode(img,keep_runs=True)
             changes.setdefault(path+'dat',[]).append((start,encoded))
             tag=int.from_bytes(t.source[:4],'little')
             off,rec=lookup[cat.thumbs[n]]
@@ -157,6 +161,10 @@ def build(apkfile,channel,root,out,fontfile):
         manifest=json.loads(apk.read('assets/json/weik-cache.json'));files=manifest['files']
         source_manifest=json.loads((Path(__file__).resolve().parents[2]/'weik-cache.json').read_bytes())['files']
         locals_,snow=compiled_models(root,apk,config['year'])
+        for phase in ('Rasv','Day','Zakat'):
+            for suffix in ('','_blur'):
+                name=f'loader/BR_Nebo_{phase}{suffix}.png'
+                locals_[name]=winter_sky((root/name).read_bytes(),phase)
         for n in winter.namelist():
             raw=winter.read(n)
             if n.lower().endswith(('timecyc.dat','ctimecy.dat')):raw=timecycle(raw)

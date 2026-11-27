@@ -100,12 +100,20 @@ class Texture:
     def image(self):
         return Image.frombytes('RGBA', self.size, self.raw,'bcn',(1 if self.block==8 else 3,))
 
-    def encode(self, image, keep_runs=False):
+    def encode(self, image, keep_runs=False, block_span=1):
         image=image.convert('RGBA')
         w,h=self.size
         raw=bytearray()
         while len(raw)<len(self.raw):
             im=image.resize((w,h),Image.Resampling.LANCZOS)
+            if block_span>1 and w>=4*block_span:
+                # Neighbouring BC blocks share one averaged pattern on smooth lamp masks.
+                # Align groups per mip row so no old bright/dark RLE silhouette leaks through.
+                import numpy as np
+                pixels=np.array(im)
+                rows=pixels.reshape(h,w//(4*block_span),block_span,4,4)
+                rows[:]=np.rint(rows.mean(axis=2,keepdims=True)).astype(np.uint8)
+                im=Image.fromarray(pixels)
             s=BytesIO()
             im.save(s,format='DDS',pixel_format='DXT1' if self.block==8 else 'DXT5')
             raw.extend(s.getvalue()[128:])
