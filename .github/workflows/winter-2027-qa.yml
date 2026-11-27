@@ -1,0 +1,27 @@
+name: Winter map and vehicle acceptance on Android ARM64
+on:
+  push:
+    branches: [work/winter-2027]
+    paths: ['winter/2027/**', '.github/workflows/winter-2027-qa.yml']
+permissions:
+  contents: read
+jobs:
+  world:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 32
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [baseline, winter]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture the same route on both clients
+        env:
+          EDITION: ${{ matrix.edition }}
+        run: bash winter/2027/qa/android.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: winter-world-${{ matrix.edition }}
+          path: ${{ runner.temp }}/winter/evidence/
+          if-no-files-found: ignore
