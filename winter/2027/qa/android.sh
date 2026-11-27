@@ -42,15 +42,16 @@ if test "$EDITION" = winter; then
   app=unsigned.apk
   pkg=com.russiarp.snow
 elif test "$EDITION" = headlights; then
-  app="$RUNNER_TEMP/RUSSIA-RP-1.7.25-Winter-Lights.apk"
+  app="$RUNNER_TEMP/RUSSIA-RP-1.7.26-Winter-Lights.apk"
   pkg=com.russiarp.winter27.lights
   fetch "$origin/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" winter-1724.apk
   apksigner verify --verbose "$app"
   adb install -g winter-1724.apk
-  adb install -g "$app"
+  adb install -g "$RUNNER_TEMP/previous.apk"
+  adb install -r -g "$app"
   adb shell pm path com.russiarp.winter27 | grep -q 'base.apk'
-  adb shell pm path "$pkg" | grep -q 'base.apk'
-  echo 'Installed alongside Winter Weik 1.7.24' >evidence/coexistence.txt
+  adb shell dumpsys package "$pkg" | grep -F 'versionName=1.7.26'
+  echo 'Upgraded Lights 1.7.25 alongside Winter Weik 1.7.24' >evidence/coexistence.txt
   adb uninstall "$pkg"
 elif test "$EDITION" = standalone; then
   pkg=com.russiarp.winter27
@@ -181,3 +182,19 @@ adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || tr
 grep -q 'RRP QA END' evidence/server.txt
 test "${#seen[@]}" = 23
 test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7
+
+if test "$EDITION" = headlights; then
+  python3 - <<'PYTHON'
+from PIL import Image, ImageChops
+# Fixed camera over the asphalt in frames 21/22. Exclude sky, UI and the car.
+with Image.open('evidence/world-21.png') as off, Image.open('evidence/world-22.png') as on:
+    width, height = on.size
+    road = (round(width * .15), round(height * .60), round(width * .39), round(height * .77))
+    diff = ImageChops.subtract(on.convert('RGB'), off.convert('RGB')).crop(road).convert('L')
+    histogram = diff.histogram()
+    brightened = sum(histogram[45:]) / sum(histogram)
+    print(f'Asphalt pixels brightened by at least 45 levels: {brightened:.1%}')
+    if brightened < .10:
+        raise SystemExit('Headlight core too faint on asphalt')
+PYTHON
+fi

@@ -78,7 +78,7 @@ def edit_dex(project,meta,manifest,preview,preview_id):
 '''+target)
     path.write_text(s)
     conf=project/'smali_classes3/com/wn/blackrussia/BuildConfig.smali'
-    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x31'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.25"')
+    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x32'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.26"')
     if preview:s=s.replace('com.russiarp.hudx',preview_id)
     conf.write_text(s)
     if preview:
@@ -107,6 +107,48 @@ def edit_dex(project,meta,manifest,preview,preview_id):
 """+anchor)
         path.write_text(s)
 
+def headlight_renderer(data, library, abi):
+    # Both renderers use five vertices per headlamp. Keep the fully transparent
+    # far edge, the model transform and the original vehicle colour. A 14-unit
+    # reach with half-width 2.125 preserves the opening angle of the older beam.
+    # Peak alpha is 248 - 64 * abs(view dot forward), so the front three-quarter
+    # view still has a bright core. Source-over retains detail on white snow.
+    tweaks = {
+        ("libGame.so", "arm64-v8a"): [
+            (0x6b48a4, "e1031f32", "c1008052"),
+            (0x6b48e8, "0856a852", "0850a852"),
+            (0x6b4970, "0b502e1e", "0b30201e"),
+            (0x6b49a4, "29590011", "29e10211"),
+            (0x6b49e8, "15d0231e", "1590251e"),
+        ],
+        ("libGame.so", "armeabi-v7a"): [
+            (0x59088a, "0221", "0621"),
+            (0x5908b8, "b7ee02ea", "b0ee01ea"),
+            (0x59097c, "b7ee045a", "b0ee0f5a"),
+            (0x5909a0, "b1ee0e6a", "b2ee0c6a"),
+            (0x590b64, "0000b042", "00008042"),
+        ],
+        ("libmultiplayer.so", "arm64-v8a"): [
+            (0x1b24e4, "01902e1e", "01f0211e"),
+            (0x1b24e8, "0856a852", "0850a852"),
+            (0x1b2630, "11d0231e", "1190251e"),
+            (0x1b264c, "16502e1e", "1630201e"),
+        ],
+        ("libmultiplayer.so", "armeabi-v7a"): [
+            (0x123bcc, "b7ee023a", "b0ee013a"),
+            (0x123bd0, "b7ee044a", "b0ee0f4a"),
+            (0x123bd4, "b1ee0e5a", "b2ee0c5a"),
+            (0x123df4, "0000b042", "00008042"),
+        ],
+    }
+    result = bytearray(data)
+    for offset, original, adjusted in tweaks[library, abi]:
+        before = bytes.fromhex(original)
+        if result[offset:offset + len(before)] != before:
+            raise ValueError(f'Unexpected headlamp code in {abi}/{library} at {offset:x}')
+        result[offset:offset + len(before)] = bytes.fromhex(adjusted)
+    return bytes(result)
+
 def package(base,assets,apktool,out,preview,r8=None,standalone=False):
     preview = preview or standalone
     preview_id = 'com.russiarp.winter27.lights' if standalone else 'com.russiarp.snow'
@@ -124,7 +166,7 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
         run('b','-j','2',project,'-o',built)
         doc=Doc(z.read('AndroidManifest.xml'));root=doc.elements()[0]
         assert root.get('versionCode')==46
-        root.set('versionCode',16,49);root.set('versionName',3,doc.pool.add('1.7.25'))
+        root.set('versionCode',16,50);root.set('versionName',3,doc.pool.add('1.7.26'))
         if preview:
             doc.pool.values=[s.replace('com.russiarp.hudx',preview_id) for s in doc.pool.values]
             app=next(e for e in doc.elements() if e.tag=='application')
@@ -142,12 +184,13 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
             files['classes9.dex']=classes/'classes.dex'
         with ZipFile(built) as compiled,ZipFile(out,'w',allowZip64=False) as result:
             edits={'AndroidManifest.xml':doc.encode(),**{n:compiled.read(n) for n in dexfiles}}
-            # Inherit both light renderers from the 1.7.22 base. Its per-lamp
-            # geometry, vertex alpha and blend modes are the 1.7.21 implementation.
             for abi in ('arm64-v8a', 'armeabi-v7a'):
-                path = f'lib/{abi}/libmultiplayer.so'
-                previous_label = b'RUSSIA RP 1.7.22%.0s'
-                edits[path] = once(z.read(path), previous_label, b'RUSSIA RP 1.7.25%.0s')
+                for library in ('libGame.so', 'libmultiplayer.so'):
+                    path = f'lib/{abi}/{library}'
+                    renderer = headlight_renderer(z.read(path), library, abi)
+                    if library == 'libmultiplayer.so':
+                        renderer = once(renderer, b'RUSSIA RP 1.7.22%.0s', b'RUSSIA RP 1.7.26%.0s')
+                    edits[path] = renderer
             def put(name,raw,method):
                 info=ZipInfo(name,(2026,1,1,0,0,0));info.compress_type=method
                 if method==ZIP_STORED:

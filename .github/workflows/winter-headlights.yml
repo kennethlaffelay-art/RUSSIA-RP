@@ -1,27 +1,27 @@
-name: Winter 1.7.25 headlight check and release
+name: Winter 1.7.26 headlight check and release
 on:
   push:
-    branches: [release/winter-1.7.25-headlights]
+    branches: [release/winter-1.7.26-headlights]
     paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml']
 permissions:
   contents: read
 env:
-  APK: RUSSIA-RP-1.7.25-Winter-Lights.apk
-  SHA256: 9194a12e98eeb496c55767c880e1a5813e48e87ccaffd96dc69a52882e2b5988
+  APK: RUSSIA-RP-1.7.26-Winter-Lights.apk
+  SHA256: 0f2e331762b6ee69b22918f609efda48c5d287528727622919d9826cacf39ec4
 jobs:
   headlights:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Restore the signed 1.7.25 candidate
+      - name: Restore the signed 1.7.26 candidate
         working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" -o previous.apk
-          echo 'f4b7c000f567e8087da6f25d5414e657d80376a27e7a082b9253ceaec72b44fa  previous.apk' | sha256sum -c -
-          cat "$GITHUB_WORKSPACE"/winter/2027/release/1.7.25/headlights.zst.* >headlights.zst
-          echo '397447b432eb815aa76995b1d0bddabf9b65ab002a1d6acb3a7b9e7da336a618  headlights.zst' | sha256sum -c -
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.25-winter-lights/RUSSIA-RP-1.7.25-Winter-Lights.apk" -o previous.apk
+          echo '9194a12e98eeb496c55767c880e1a5813e48e87ccaffd96dc69a52882e2b5988  previous.apk' | sha256sum -c -
+          cat "$GITHUB_WORKSPACE"/winter/2027/release/1.7.26/headlights.zst.* >headlights.zst
+          echo 'c87d783881413c6641cbb02afe86fd8293e97839b14f406dc9e198214c5737b9  headlights.zst' | sha256sum -c -
           zstd -qd --long=27 --patch-from=previous.apk headlights.zst -o "$APK"
           echo "$SHA256  $APK" | sha256sum -c -
       - name: Upgrade the previous cache and record the lights on Android ARM64
@@ -56,7 +56,7 @@ jobs:
       - name: Publish Android client and in-game comparison
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: russia-rp-v1.7.25-winter-lights
+          TAG: russia-rp-v1.7.26-winter-lights
         run: |
           set -euo pipefail
           echo "$SHA256  $APK" | sha256sum -c -
@@ -74,5 +74,5 @@ jobs:
           cp evidence/world-17.png lights-off.png
           cp evidence/world-18.png lights-on.png
           gh release create "$TAG" "$APK" lights-off.png lights-on.png asphalt-off.png asphalt-on.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "RUSSIA RP 1.7.25 · Зима 2027 · Фары" \
-            --notes "Зимний Android-клиент с двумя расширяющимися пучками тёплого белого света. Устанавливается рядом с Winter Weik 1.7.24 как отдельное приложение и использует папку Weik. При первом запуске разрешите доступ к файлам. Кадры lights-off и lights-on сняты с одной точки в игре."
+            --title "RUSSIA RP 1.7.26 · Зима 2027 · Фары" \
+            --notes "Два более ярких и длинных луча фар. Файлы asphalt-off и asphalt-on показывают одну машину на асфальте на закате. Устанавливается поверх Winter Lights 1.7.25 или рядом с Winter Weik 1.7.24. Для проверки установленного кеша Weik разрешите доступ к файлам."
