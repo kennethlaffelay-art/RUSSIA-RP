@@ -1,5 +1,6 @@
 // Local camera route used only by the Android acceptance job.
 #include <open.mp>
+#include <Pawn.RakNet>
 new carA,carB,extraCars[4],snow[5];
 forward StartRoute(p);
 forward Frame(p,step);
@@ -29,8 +30,21 @@ public OnPlayerSpawn(playerid) {
 stock Camera(p,Float:x,Float:y,Float:z,Float:tx,Float:ty,Float:tz) {
     SetPlayerCameraPos(p,x,y,z);SetPlayerCameraLookAt(p,tx,ty,tz);
 }
+stock ShowPlate(playerid,vehicleid,const number[],const region[]) {
+    // Stock SA-MP sets a single text string. The Moscow client receives a typed
+    // registration and its region separately when the vehicle is streamed in.
+    new BitStream:bs=BS_New();
+    BS_WriteValue(bs,PR_UINT8,251,PR_UINT32,516,PR_UINT32,vehicleid,PR_UINT32,1,PR_STRING8,number,PR_STRING8,region);
+    PR_SendPacket(bs,playerid);
+    BS_Delete(bs);
+}
 public Frame(p,step) {
     if(!IsPlayerConnected(p))return 1;
+    if(step==1 || step==8) {
+        ShowPlate(p,carA,"A518MP","77");
+        ShowPlate(p,carB,"T204KK","197");
+    }
+    if(step==14)ShowPlate(p,carA,"P607CT","7");
     switch(step) {
         case 0: {SetPlayerTime(p,13,0);Camera(p,753.0,-2351.0,85.0,719.0,-2297.0,37.0);}
         case 1: Camera(p,713.0,-2321.0,38.1,719.0,-2312.0,42.0);

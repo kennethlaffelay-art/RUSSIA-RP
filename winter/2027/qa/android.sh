@@ -65,6 +65,10 @@ apksigner sign --ks qa.p12 --ks-pass pass:android-test --out recorder/test.apk r
 fetch https://github.com/openmultiplayer/open.mp/releases/download/v1.6.7.3218/open.mp-linux-x86.tar.gz omp.tar.gz
 echo '0f7bfe70bb68ea780fe24a910b69412046e53d10feb65a9d4a9de8ff1f7f1329  omp.tar.gz' | sha256sum -c -
 tar xzf omp.tar.gz
+fetch https://github.com/katursis/Pawn.RakNet/releases/download/1.6.0-omp/pawnraknet-1.6.0-omp-linux.tar.gz plates-qa.tar.gz
+echo '0cdc9690ea421dead02560f6c550c68ea17540d00a27eed4c8b6e3b0841afbe6  plates-qa.tar.gz' | sha256sum -c -
+tar xOf plates-qa.tar.gz pawnraknet.so >Server/components/pawnraknet.so
+tar xOf plates-qa.tar.gz Pawn.RakNet.inc >Server/qawno/include/Pawn.RakNet.inc
 cp "$src/qa/plaza.pwn" Server/gamemodes/
 python3 - <<'PY'
 from pathlib import Path
