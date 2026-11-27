@@ -99,6 +99,18 @@ public Frame(p,step) {
         }
         case 18: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
         case 19: SetVehicleZAngle(carA,32.0);
+        // This section of the winter map uses the dark new_asf_center material.
+        case 20: {
+            SetPlayerTime(p,19,0);SetPlayerPos(p,889.0,-2530.0,39.6);
+            SetVehiclePos(carA,889.0,-2530.0,39.65);SetVehicleZAngle(carA,0.0);
+            SetVehicleParamsEx(carA,1,0,0,0,0,0,0);PutPlayerInVehicle(p,carA,0);
+        }
+        case 21: {
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            RemovePlayerFromVehicle(p);SetPlayerPos(p,x+4.0,y+2.0,z+0.4);
+            Camera(p,x-2.9,y+6.9,z+1.22,x,y+1.0,z+0.08);
+        }
+        case 22: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);

@@ -179,5 +179,5 @@ done
 adb logcat -b crash -d >evidence/crash.txt
 adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || true
 grep -q 'RRP QA END' evidence/server.txt
-test "${#seen[@]}" = 20
+test "${#seen[@]}" = 23
 test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7

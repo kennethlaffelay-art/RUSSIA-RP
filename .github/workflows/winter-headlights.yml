@@ -60,12 +60,19 @@ jobs:
         run: |
           set -euo pipefail
           echo "$SHA256  $APK" | sha256sum -c -
+          cp evidence/world-21.png asphalt-off.png
+          cp evidence/world-22.png asphalt-on.png
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | jq -e --arg apk "$APK" --arg hash "sha256:$SHA256" 'any(.assets[]; .name==$apk and .digest==$hash)'
+            for asset in asphalt-off.png asphalt-on.png; do
+              if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$asset"; then
+                gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
+              fi
+            done
             exit 0
           fi
           cp evidence/world-17.png lights-off.png
           cp evidence/world-18.png lights-on.png
-          gh release create "$TAG" "$APK" lights-off.png lights-on.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+          gh release create "$TAG" "$APK" lights-off.png lights-on.png asphalt-off.png asphalt-on.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "RUSSIA RP 1.7.25 · Зима 2027 · Фары" \
             --notes "Зимний Android-клиент с двумя расширяющимися пучками тёплого белого света. Устанавливается рядом с Winter Weik 1.7.24 как отдельное приложение и использует папку Weik. При первом запуске разрешите доступ к файлам. Кадры lights-off и lights-on сняты с одной точки в игре."
