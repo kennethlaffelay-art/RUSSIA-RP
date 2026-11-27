@@ -31,21 +31,27 @@ root=Weik
 app=baseline.apk
 mkdir -p recorder
 fetch https://storage.googleapis.com/r8-releases/raw/8.3.37/r8.jar recorder/r8.jar
-if [[ "$EDITION" = winter || "$EDITION" = headlights ]]; then
+if test "$EDITION" = winter; then
   git clone -q https://github.com/Parik27/DragonFF.git dragon
   git -C dragon checkout -q 319847f7803f102c5aa31fa38e8b3284117db40a
   python3 -m venv env
   env/bin/pip -q install 'Pillow==12.2.0' numpy scipy fonttools
   fetch https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar apktool.jar
   PYTHONPATH=dragon env/bin/python "$src/build_assets.py" baseline.apk cache20.zip Weik assets-out /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
-  mode=--preview
-  pkg=com.russiarp.snow
-  if test "$EDITION" = headlights; then
-    mode=--standalone
-    pkg=com.russiarp.winter27
-  fi
-  env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk "$mode" --r8 recorder/r8.jar
+  env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk --preview --r8 recorder/r8.jar
   app=unsigned.apk
+  pkg=com.russiarp.snow
+elif test "$EDITION" = headlights; then
+  app="$RUNNER_TEMP/RUSSIA-RP-1.7.25-Winter-Lights.apk"
+  pkg=com.russiarp.winter27.lights
+  fetch "$origin/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" winter-1724.apk
+  apksigner verify --verbose "$app"
+  adb install -g winter-1724.apk
+  adb install -g "$app"
+  adb shell pm path com.russiarp.winter27 | grep -q 'base.apk'
+  adb shell pm path "$pkg" | grep -q 'base.apk'
+  echo 'Installed alongside Winter Weik 1.7.24' >evidence/coexistence.txt
+  adb uninstall "$pkg"
 elif test "$EDITION" = standalone; then
   pkg=com.russiarp.winter27
   app="$RUNNER_TEMP/RUSSIA-RP-1.7.24-Winter-Weik.apk"
@@ -62,7 +68,6 @@ fi
 previous=baseline.apk
 if test "$EDITION" = headlights; then
   previous=winter-1724.apk
-  fetch "$origin/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" "$previous"
   echo "f4b7c000f567e8087da6f25d5414e657d80376a27e7a082b9253ceaec72b44fa  $previous" | sha256sum -c -
 fi
 python3 "$src/qa/stage.py" Weik "$previous" cache20.zip

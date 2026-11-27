@@ -109,7 +109,7 @@ def edit_dex(project,meta,manifest,preview,preview_id):
 
 def package(base,assets,apktool,out,preview,r8=None,standalone=False):
     preview = preview or standalone
-    preview_id = 'com.russiarp.winter27' if standalone else 'com.russiarp.snow'
+    preview_id = 'com.russiarp.winter27.lights' if standalone else 'com.russiarp.snow'
     if hashlib.sha256(base.read_bytes()).hexdigest()!='a6bbb1a9aafdd0358e57c8938179fc0ec346ab5d5b9eb656a41ca2fc62c226a1':raise ValueError('Requires 1.7.22')
     meta=json.loads((assets/'integration.json').read_bytes())
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp,ZipFile(base) as z:
@@ -128,7 +128,7 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
         if preview:
             doc.pool.values=[s.replace('com.russiarp.hudx',preview_id) for s in doc.pool.values]
             app=next(e for e in doc.elements() if e.tag=='application')
-            label = 'RUSSIA RP · Зима 2027' if standalone else 'RUSSIA RP · Зима'
+            label = 'RUSSIA RP · Зима 2027 · Фары' if standalone else 'RUSSIA RP · Зима'
             app.set('label',3,doc.pool.add(label))
         files={p.relative_to(assets).as_posix():p for p in (assets/'assets').rglob('*') if p.is_file()}
         if preview:
@@ -144,6 +144,10 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
             edits={'AndroidManifest.xml':doc.encode(),**{n:compiled.read(n) for n in dexfiles}}
             # Inherit both light renderers from the 1.7.22 base. Its per-lamp
             # geometry, vertex alpha and blend modes are the 1.7.21 implementation.
+            for abi in ('arm64-v8a', 'armeabi-v7a'):
+                path = f'lib/{abi}/libmultiplayer.so'
+                previous_label = b'RUSSIA RP 1.7.22%.0s'
+                edits[path] = once(z.read(path), previous_label, b'RUSSIA RP 1.7.25%.0s')
             def put(name,raw,method):
                 info=ZipInfo(name,(2026,1,1,0,0,0));info.compress_type=method
                 if method==ZIP_STORED:

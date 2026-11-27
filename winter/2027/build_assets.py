@@ -200,7 +200,7 @@ def plaza_ground(stream,idx):
     if not found or any(raw[offset:]) or len(out)>capacity:raise ValueError('Unexpected map7 collision bank')
     return start,out.ljust(capacity,b'\0')
 
-def build(apkfile,channel,root,out,fontfile):
+def build(apkfile,channel,root,out,fontfile,previous=None):
     if digest(apkfile.read_bytes())!=APK_SHA or digest(channel.read_bytes())!=CACHE_SHA:raise ValueError('Version mismatch')
     out.mkdir(parents=True,exist_ok=True)
     config=json.loads(Path(__file__).with_name('season.json').read_text())
@@ -252,7 +252,33 @@ def build(apkfile,channel,root,out,fontfile):
             metadata['delta'][n]={'hash':finalhash,'source':source,'at':sample_off+sample_index,
                                   'sample':sample_data[sample_index:sample_index+24].hex()}
             save('assets/weik-defaults/'+n+'.patch',serialise_patch(sz,total))
-        save('assets/json/weik-cache.json',json.dumps(manifest,separators=(',',':')).encode())
         save('assets/russia/plate.ttf',change_font(apk.read('assets/russia/plate.ttf')))
+        if previous:
+            # Use the distributed winter files for every unrelated resource. Native
+            # font/raster library versions can differ between build machines.
+            if digest(previous.read_bytes()) != 'f4b7c000f567e8087da6f25d5414e657d80376a27e7a082b9253ceaec72b44fa':
+                raise ValueError('Requires the published 1.7.24 Winter Weik APK')
+            with ZipFile(previous) as release:
+                previous_files = json.loads(release.read('assets/json/weik-cache.json'))['files']
+                for name, ranges in metadata['delta'].items():
+                    if name.startswith('texdb/txd/'):
+                        continue
+                    member = 'assets/weik-defaults/' + name + '.patch'
+                    content = release.read(member)
+                    save(member, content)
+                    files[name] = previous_files[name]
+                    ranges['hash'] = files[name][0]
+                    at = ranges['at']
+                    _, patches = patch_ranges(content)
+                    ranges['sample'] = next(data[at-off:at-off+24].hex() for off, data in patches
+                                            if off <= at and at + 24 <= off + len(data))
+                for name, row in metadata['bundled'].items():
+                    member = 'assets/weik-defaults/' + name
+                    content = release.read(member)
+                    save(member, content)
+                    files[name] = previous_files[name]
+                    row.update(size=len(content), sample=content[row['at']:row['at']+24].hex())
+                save('assets/russia/plate.ttf',release.read('assets/russia/plate.ttf'))
+        save('assets/json/weik-cache.json',json.dumps(manifest,separators=(',',':')).encode())
         save('integration.json',json.dumps(metadata,indent=2).encode())
 if __name__=='__main__':build(*map(Path,sys.argv[1:]))
