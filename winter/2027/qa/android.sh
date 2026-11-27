@@ -68,6 +68,7 @@ adb install -g "$app"
 adb shell appops set --uid "$pkg" MANAGE_EXTERNAL_STORAGE allow
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb push Weik/. "/sdcard/$root/" >push.log
 adb logcat -c
 # Launch the real native activity with the loopback settings already written.
@@ -78,11 +79,20 @@ for n in $(seq 1 145); do
   stage=$(awk '/RRP QA FRAME [0-9]+/{print $NF}' evidence/server.txt | tail -1)
   if [[ -n "$stage" && -z "${seen[$stage]:-}" ]]; then
     sleep 2
-    adb exec-out screencap -p >"evidence/scene-$stage.png"
-    surface=$(adb shell dumpsys SurfaceFlinger --list | tr -d '\r' | grep SurfaceView | grep -F "$pkg" | head -1 || true)
-    if test -n "$surface"; then
-      adb shell "dumpsys SurfaceFlinger --latency '$surface'" >"evidence/frames-$stage.txt"
+    if test "$stage" = 0; then
+      adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity' >evidence/focus.txt || true
+      adb shell uiautomator dump /sdcard/qa-window.xml >/dev/null || true
+      adb pull /sdcard/qa-window.xml evidence/window.xml >/dev/null || true
+      adb shell dumpsys SurfaceFlinger --list >evidence/surfaces.txt
     fi
+    adb exec-out screencap -p >"evidence/scene-$stage.png"
+    while IFS= read -r surface; do
+      adb shell "dumpsys SurfaceFlinger --latency '$surface'" >frames.tmp
+      if awk 'NF==3 && $2>0 && $2<9e18 {n++} END {exit !(n>=5)}' frames.tmp; then
+        cp frames.tmp "evidence/frames-$stage.txt"
+        break
+      fi
+    done < <(adb shell dumpsys SurfaceFlinger --list | tr -d '\r' | grep SurfaceView | grep -F "$pkg")
     seen[$stage]=yes
   fi
   if grep -q 'RRP QA END' evidence/server.txt; then break; fi
@@ -93,3 +103,4 @@ adb logcat -b crash -d >evidence/crash.txt
 adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || true
 grep -q 'RRP QA END' evidence/server.txt
 test "${#seen[@]}" = 13
+test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7

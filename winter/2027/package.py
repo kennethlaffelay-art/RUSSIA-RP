@@ -141,6 +141,9 @@ def package(base,assets,apktool,out,preview):
             for ent in z.infolist():
                 n=ent.filename
                 if re.fullmatch(r'META-INF/(MANIFEST\.MF|[^/]+\.(SF|RSA|EC|DSA))',n,re.I):continue
+                if n.startswith('assets/weik-defaults/') and n.endswith('.patch'):
+                    if n.removeprefix('assets/weik-defaults/').removesuffix('.patch') in meta['bundled']:
+                        continue
                 if n in files:raw=files.pop(n).read_bytes()
                 elif n in edits:raw=edits.pop(n)
                 else:raw=z.read(n)
