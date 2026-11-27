@@ -1,6 +1,7 @@
 name: Android 16 installation from Downloads
 on:
   workflow_call:
+  workflow_dispatch:
 env:
   ANDROID_SERIAL: 127.0.0.1:5555
 permissions:
@@ -25,6 +26,7 @@ jobs:
             if test "$(timeout 4 adb shell getprop sys.boot_completed | tr -d '\r')" = 1; then break; fi
             sleep 2
           done
+          test "$(timeout 5 adb shell getprop sys.boot_completed | tr -d '\r')" = 1
           test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = 36
           adb shell getprop ro.product.cpu.abilist
           adb shell getconf PAGE_SIZE || adb shell getconf PAGESIZE
@@ -46,8 +48,9 @@ jobs:
         if: always()
         run: |
           mkdir -p evidence
-          adb logcat -d -s PackageManager PackageInstaller PackageInstallerSession AndroidRuntime > evidence/installer.log || true
-          adb exec-out screencap -p > evidence/installer.png || true
+          timeout 12 adb logcat -d -t 1200 > evidence/boot-logcat.txt || true
+          timeout 8 adb logcat -d -s PackageManager PackageInstaller PackageInstallerSession AndroidRuntime > evidence/installer.log || true
+          timeout 8 adb exec-out screencap -p > evidence/installer.png || true
           docker logs phone --tail 100 > evidence/boot.txt 2>&1 || true
       - uses: actions/upload-artifact@v4
         if: always()

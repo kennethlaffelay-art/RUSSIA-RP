@@ -2,7 +2,7 @@ name: Winter 1.7.30 vehicle materials and Android 16
 on:
   push:
     branches: [release/winter-1.7.30-vehicles]
-    paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml', '.github/workflows/winter-android16.yml']
+    paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml', '.github/workflows/android16-google.yml']
 permissions:
   contents: read
 env:
@@ -10,7 +10,7 @@ env:
   SHA256: ac2b0163930ffc700f9f98c73425a7f98377babb4f51fae172298b3f2525141c
 jobs:
   android16:
-    uses: ./.github/workflows/winter-android16.yml
+    uses: ./.github/workflows/android16-google.yml
   headlights:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
@@ -90,4 +90,4 @@ jobs:
           cp evidence/world-18.png lights-on.png
           gh release create "$TAG" "$APK" lights-off.png lights-on.png asphalt-off.png asphalt-on.png headlamp-closeup.png snow-rear.png snow-side.png snow-front.png clear-coat.png side-light.png wet-road.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "RUSSIA RP 1.7.30 · Зима 2027 · Автомобили" \
-            --notes "Новые материалы кузова и хрома, мягкое ядро блика, сохранение прозрачности стекла. Проверены чистая установка и обновление с 1.7.29 через системный установщик Android 16 ARM64."
+            --notes "Новые материалы кузова и хрома, мягкое ядро блика, сохранение прозрачности стекла. Проверены чистая установка и обновление с 1.7.29 через системный установщик Android 16 (образ Google APIs)."

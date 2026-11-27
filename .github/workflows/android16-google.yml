@@ -1,5 +1,6 @@
 name: Android 16 Google system image installation
 on:
+  workflow_call:
   push:
     branches: [release/winter-1.7.30-vehicles]
     paths: ['.github/workflows/android16-google.yml']
