@@ -15,10 +15,10 @@ def plate(size, font):
     rounded((1,1,254.9,62.9),4,(26,29,32))
     rounded((3,3,253,61),3,(211,215,217))
     canvas.rectangle((192*scale,3*scale,193*scale,61*scale),fill=(32,35,37))
-    canvas.text((199*scale,44*scale),'RUS',font=ImageFont.truetype(font,12*scale),fill=(28,31,33),stroke_width=0)
-    canvas.rectangle((228*scale,44*scale,248*scale,56*scale),fill=(56,60,64))
+    canvas.text((197*scale,37*scale),'RUS',font=ImageFont.truetype(font,13*scale),fill=(28,31,33),stroke_width=0)
+    canvas.rectangle((228*scale,39*scale,248*scale,51*scale),fill=(56,60,64))
     for i,c in enumerate([(234,235,234),(32,74,151),(183,54,61)]):
-        canvas.rectangle((229*scale,(45+i*3.5)*scale,247*scale,(48.5+i*3.5)*scale),fill=c)
+        canvas.rectangle((229*scale,(40+i*3.5)*scale,247*scale,(43.5+i*3.5)*scale),fill=c)
     return image.resize((w,h),Image.Resampling.LANCZOS)
 
 def woodlands(original,name):
@@ -65,7 +65,7 @@ def pine(original):
     p=np.asarray(original).copy()
     yy,xx=np.indices(p.shape[:2])
     brightness=p[:,:,:3].astype(float).mean(2)
-    frost=np.clip((brightness-65)/100 + .16*np.cos(yy*.16+np.sin(xx*.07)),0,.68)
+    frost=np.clip(.18+(brightness-51)/116 + .17*np.cos(yy*.16+np.sin(xx*.07)),.08,.65)
     for i, channel in enumerate([185,197,204]):
         p[:,:,i]=p[:,:,i]*(1-frost)+channel*frost
     return Image.fromarray(p)
@@ -85,7 +85,7 @@ def headlamp(original, name):
     colors=np.stack([np.uint8(np.clip(light,0,1)**.84*c) for c in [245,245,239]],axis=2)
     im=Image.fromarray(colors).convert('RGBA')
     if name=='headlight':
-        im.putalpha(Image.fromarray(np.uint8(255*np.clip(light*6,0,1))))
+        im.putalpha(Image.fromarray(np.uint8(236*np.clip(light,0,1)**.92)))
     return im
 
 def halo(original):

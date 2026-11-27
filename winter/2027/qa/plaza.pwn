@@ -4,6 +4,7 @@
 new carA,carB,extraCars[4],snow[5];
 forward StartRoute(p);
 forward Frame(p,step);
+forward SettleCars(p,phase);
 main() {}
 public OnGameModeInit() {
     SetGameModeText("Winter acceptance");
@@ -22,9 +23,21 @@ public OnPlayerConnect(playerid) {
 public OnPlayerRequestClass(playerid,classid) { return 1; }
 public StartRoute(p) { if(IsPlayerConnected(p)) SpawnPlayer(p);return 1; }
 public OnPlayerSpawn(playerid) {
-    TogglePlayerControllable(playerid,false);
     SetPlayerWeather(playerid,1);
-    SetTimerEx("Frame",3500,false,"ii",playerid,0);
+    SetTimerEx("SettleCars",900,false,"ii",playerid,0);
+    return 1;
+}
+public SettleCars(p,phase) {
+    if(!IsPlayerConnected(p))return 1;
+    if(phase<2) {
+        PutPlayerInVehicle(p,phase==0?carA:carB,0);
+        SetTimerEx("SettleCars",2200,false,"ii",p,phase+1);
+        return 1;
+    }
+    RemovePlayerFromVehicle(p);
+    SetPlayerPos(p,719.0,-2325.0,37.35);
+    TogglePlayerControllable(p,false);
+    SetTimerEx("Frame",1800,false,"ii",p,0);
     return 1;
 }
 stock Camera(p,Float:x,Float:y,Float:z,Float:tx,Float:ty,Float:tz) {
@@ -47,7 +60,7 @@ public Frame(p,step) {
     if(step==14)ShowPlate(p,carA,"P607CT","7");
     switch(step) {
         case 0: {SetPlayerTime(p,13,0);Camera(p,753.0,-2351.0,85.0,719.0,-2297.0,37.0);}
-        case 1: Camera(p,713.0,-2321.0,38.1,719.0,-2312.0,42.0);
+        case 1: Camera(p,708.0,-2335.0,38.1,718.5,-2313.0,42.8);
         case 2: {SetPlayerTime(p,23,0);Camera(p,710.0,-2298.0,40.0,722.0,-2268.0,46.0);}
         case 3: {SetPlayerPos(p,719.0,-2342.0,37.40);SetPlayerTime(p,12,0);Camera(p,729.0,-2337.00,38.0,718.0,-2343.00,37.0);}
         case 4: {SetPlayerTime(p,22,30);SetVehicleParamsEx(carA,1,0,0,0,0,0,0);Camera(p,717.0,-2335.00,38.2,714.0,-2343.00,37.2);}
@@ -67,7 +80,7 @@ public Frame(p,step) {
         case 13: {SetPlayerTime(p,13,0);Camera(p,717.0,-2335.00,38.2,714.0,-2343.00,37.2);}
         case 14: {SetPlayerTime(p,22,0);Camera(p,714.0,-2347.10,37.14,714.0,-2345.10,36.98);}
         case 15: {SetPlayerTime(p,13,0);Camera(p,724.0,-2339.10,37.12,724.0,-2340.75,36.91);}
-        case 16: {SetPlayerTime(p,12,30);SetPlayerPos(p,1044.0,-2183.0,40.0);Camera(p,1038.0,-2182.0,40.6,1060.0,-2174.0,39.8);}
+        case 16: {SetPlayerTime(p,12,30);SetPlayerPos(p,848.0,-2310.0,38.8);Camera(p,848.0,-2308.5,39.35,845.0,-2333.0,38.4);}
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);

@@ -165,12 +165,16 @@ def wheel_trim():
         for y in (-1.77,1.77):
             p=(11.75*math.cos(a),y,11.75*math.sin(a))
             m.jewel(p,.080,RED if i%5==0 else WARM,True)
+            if y<0 and i%2==0:m.lamp(p,(186,75,69) if i%6==0 else (232,223,213),0,.22)
         if i%10==0:
             for r in (2.5,4.5,6.5,8.5):
-                m.jewel((r*math.cos(a),-1.77,r*math.sin(a)),.093,(226,190,179),True)
+                p=(r*math.cos(a),-1.77,r*math.sin(a))
+                m.jewel(p,.093,(226,190,179),True)
+                if r in (4.5,8.5):m.lamp(p,(218,201,199),0,.15)
     for side in (-1,1):
         for t in np.linspace(.1,.9,13):
             m.jewel((side*9*t,-4.3*t,-15.1*t),.10,RED,True)
+            if .40<t<.50 or .78<t<.84:m.lamp((side*9*t,-4.3*t,-15.1*t),(179,70,60),0,.17)
     return m
 
 def year_sign(year):
@@ -204,6 +208,10 @@ def decorations():
 
 def layout(year):
     meshes=[chalet(),rink(),tree_trim(),wheel_trim(),year_sign(year),decorations()]
+    for name,scale in [('rrp_firsmall',.28),('rrp_firmedium',.46)]:
+        m=Mesh(name);branch_crown(m,False)
+        m.geo.vertices=[rw.Vector(*(v*scale for v in xyz)) for xyz in m.geo.vertices]
+        meshes.append(m)
     ids={mesh.name:13636+i for i,mesh in enumerate(meshes)}
     z=36.375
     places=[]
@@ -225,4 +233,6 @@ def layout(year):
     add(ids['rrp_wheelight'],'rrp_wheelight',wx,wy,16.23)
     for x,y,a in [(696,-2330,10),(697,-2310,76),(740,-2327,113),(710,-2276,25),(734,-2281,60),(706,-2266,15)]:
         add(ids['rrp_snowbank'],'rrp_snowbank',x,y,0,a)
+    for x,y,a,name in [(696,-2320,11,'rrp_firmedium'),(698,-2331,31,'rrp_firsmall'),(741,-2319,102,'rrp_firmedium'),(740,-2331,65,'rrp_firsmall'),(707,-2278,87,'rrp_firmedium'),(736,-2278,32,'rrp_firsmall')]:
+        add(ids[name],name,x,y,0,a)
     return meshes,ids,places

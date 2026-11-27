@@ -12,10 +12,10 @@ WHITE_METAL=(170,175,181)
 def surface(color,glow):
     return {
         (106,65,44):'CJ_LIGHTWOOD', (68,47,39):'ab_panel_woodgrime',
-        (211,164,78):'ab_goldpipe', (196,205,211):'new_ryazan_lesdirt_rd',
+        (211,164,78):'ab_goldpipe', (196,205,211):'ruscount_grass',
         (159,52,47):'ab_redwall', (255,213,148):'ab_metal_brass',
-        (53,65,60):'steel256128', (144,173,187):'E_KvPr_Ice',
-        (161,185,196):'new_ryazan_lesdirt_rd', BARK:'ab_panel_woodgrime',
+        (53,65,60):'steel256128', (144,173,187):'cj_chrome',
+        (161,185,196):'ruscount_grass', BARK:'ab_panel_woodgrime',
         FIR:'pinebranch1', STEEL:'steel256128', WHITE_METAL:'cj_chrome',
     }.get(tuple(color),'ab_metal_brass' if glow else 'CJ_LIGHTWOOD')
 
@@ -31,12 +31,13 @@ def material(mesh,color,glow,name=None):
         mesh.slots[key]=len(mesh.geo.materials);mesh.geo.materials.append(m)
     return mesh.slots[key]
 
-def branch_crown(mesh):
+def branch_crown(mesh,decorated=True):
     rng=random.Random(81722)
     mesh.bar((0,0,.03),(0,0,12.25),.23,BARK,sides=8)
-    for j in range(22):
-        t=j/22;z=.89+11.4*t;radius=3.26*(1-t)**.81+.09
-        count=max(7,round(24*(1-t*.66)))
+    layers=22 if decorated else 11
+    for j in range(layers):
+        t=j/layers;z=.89+11.4*t;radius=3.26*(1-t)**.81+.09
+        count=max(6,round((24 if decorated else 11)*(1-t*.66)))
         for i in range(count):
             a=i*math.tau/count+j*1.28+rng.uniform(-.10,.10)
             radial=np.array([math.cos(a),math.sin(a),0.]);tangent=np.array([-radial[1],radial[0],0.])
@@ -48,6 +49,7 @@ def branch_crown(mesh):
                 pts=[start-sideways*.38,end-sideways,end+sideways,start+sideways*.38]
                 mesh.face(pts,FIR,tex='pinebranch1',uv=[(0,0),(1,0),(1,1),(0,1)])
                 mesh.face(pts[::-1],FIR,tex='pinebranch1',uv=[(0,1),(1,1),(1,0),(0,0)])
+    if not decorated:return
     # Textured parcels and ribbons belong to the same static asset.
     for i,(x,y,s) in enumerate([(-2,-1,.85),(1.7,-.8,.69),(-.9,-2.5,.72),(1.9,1,.57),(.3,-2.1,.52)]):
         red=(159,52,47);gold=(211,164,78)

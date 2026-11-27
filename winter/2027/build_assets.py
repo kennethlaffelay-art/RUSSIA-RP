@@ -25,13 +25,30 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 def change_font(data):
+    import ctypes as ct
+    from ctypes.util import find_library
+    class Vector(ct.Structure):
+        _fields_=[('x',ct.c_long),('y',ct.c_long)]
+    class Outline(ct.Structure):
+        _fields_=[('n_contours',ct.c_short),('n_points',ct.c_short),('points',ct.POINTER(Vector)),
+                  ('tags',ct.POINTER(ct.c_ubyte)),('contours',ct.POINTER(ct.c_short)),('flags',ct.c_int)]
+    bold=ct.CDLL(find_library('freetype')).FT_Outline_Embolden
+    bold.argtypes=[ct.POINTER(Outline),ct.c_long];bold.restype=ct.c_int
     font=TTFont(BytesIO(data));cmap=font.getBestCmap()
-    for glyphname in set(cmap[ord(c)] for c in 'АВЕКМНОРСТУХ0123456789'):
+    for c in 'АВЕКМНОРСТУХ0123456789':
+        glyphname=cmap[ord(c)]
         glyph=font['glyf'][glyphname]
         if glyph.isComposite():raise ValueError('Unexpected composite plate glyph')
-        # Keep the native baseline and cell advance. Expand the outline uniformly around its centre.
         adv,lsb=font['hmtx'][glyphname];mid=adv/2
-        glyph.coordinates[:]=[(round(mid+(x-mid)*1.07),round(y*1.07)) for x,y in glyph.coordinates]
+        n=len(glyph.coordinates);points=(Vector*n)(*(Vector(x,y) for x,y in glyph.coordinates))
+        tags=(ct.c_ubyte*n)(*(1 if flag&1 else 0 for flag in glyph.flags))
+        ends=(ct.c_short*glyph.numberOfContours)(*glyph.endPtsOfContours)
+        outline=Outline(glyph.numberOfContours,n,points,tags,ends,0)
+        if bold(ct.byref(outline),13):raise ValueError('Invalid road-font contour')
+        # The native digit slots carry a bigger font size. Bring the capitals closer in
+        # apparent height and inset all glyphs above the lower edge of the bumper holder.
+        scale=.98 if c.isdigit() else 1.19
+        glyph.coordinates[:]=[(round(mid+(p.x-mid-6)*scale),round(p.y*scale+16)) for p in points]
         glyph.recalcBounds(font['glyf']);font['hmtx'][glyphname]=(adv,glyph.xMin)
     out=BytesIO();font.save(out);return out.getvalue()
 
@@ -56,7 +73,13 @@ def compiled_models(root,apk,year):
     snow=flurries();pos,capacity=index['fakesnow1.dff'];assert len(snow)<=capacity
     img[pos:pos+capacity]=snow.ljust(capacity,b'\0')
     count=struct.unpack_from('<I',img,4)[0]
-    if 8+32*(count+len(meshes))>min(s for s,n in index.values()):raise ValueError('IMG directory has insufficient space')
+    first_payload=min(s for s,n in index.values())
+    extra_pages=max(0,(8+32*(count+len(meshes))-first_payload+2047)//2048)
+    if extra_pages:
+        img[first_payload:first_payload]=bytes(extra_pages*2048)
+        for i in range(count):
+            at=8+32*i;sector=struct.unpack_from('<I',img,at)[0]
+            struct.pack_into('<I',img,at,sector+extra_pages)
     for i,m in enumerate(meshes,count):
         data=m.store();sectors=(len(data)+2047)//2048
         struct.pack_into('<II24s',img,8+32*i,len(img)//2048,sectors,(m.name+'.dff').encode())
@@ -102,7 +125,7 @@ def texture_updates(root,apk,fontfile):
     changes={}
     deciduous={'buktree1','buktree2','r_dub1','r_berez1_b','r_berez1_t','r_listv1','vyhl_listv1','vyhl_listv2','newtreeleavesb128','treecron9716','treecron9716_2','auctreecrone8712'}
     surfaces={'new_ryazan_lesdirt_rd','brusch_3','ind_road_crossing','road_blank256hv','pzu_road_03','dt_road','antey_roof1','antey_roof2','bat_bank_krysha','bazar01krish','izbaroof1','otb_rooftile1','otb_rooftile2','rooftar01_e','sad_krysha','sjm_metalroof1','ruscount_grass'}
-    open_ground={'new_ryazan_les','oldgrs2_bld_citygrass','grass_128hv','ruscount_grass'}
+    open_ground={'new_ryazan_les','oldgrs2_bld_citygrass','grass_128hv','ruscount_grass','new_ryazan_lesdirt_rd'}
     for db in ('gta_int','loader_car','txd','samp'):
         cat=Textures(root,db);path='texdb/'+db+'/'+db+'.dxt.'
         thumbs=(root/(path+'tmb')).read_bytes();lookup=[];pos=0
@@ -205,7 +228,8 @@ def build(apkfile,channel,root,out,fontfile):
         for n,raw in locals_.items():
             h=digest(raw);files[n]=[h,len(raw),0,len(raw),0]
             save('assets/weik-defaults/'+n,raw)
-            metadata['bundled'][n]={'size':len(raw),'sample':bytes(raw[:24]).hex()}
+            at=max(0,len(raw)//2-12)
+            metadata['bundled'][n]={'size':len(raw),'at':at,'sample':bytes(raw[at:at+24]).hex()}
         for n,new in patches.items():
             original=root/n;source=source_manifest[n]
             with original.open('rb') as stream:

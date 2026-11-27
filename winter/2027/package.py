@@ -51,6 +51,18 @@ def edit_dex(project,meta,manifest,preview):
                         f'    invoke-static {{p0, v1, v2, v3}}, {cat}->matches(Ljava/io/File;JLjava/lang/String;)Z',
                         '    move-result v0','    return v0',f'    :winter_sample_{i}'])
     s=once(s,target,'    :cond_0\n'+'\n'.join(samples)+'\n    goto :winter_stock\n    :winter_bad_size\n    const/4 v0, 0\n    return v0\n    :winter_stock\n'+target.split('\n')[1])
+    # Also repair interrupted installs when the original, shorter readiness list passes.
+    start=s.index('.method public static ready(');end=s.index('.end method',start)
+    ready=s[start:end]
+    anchor='    :cond_0\n'
+    extra=[]
+    for i,name in enumerate({**meta['bundled'],**meta['delta']}):
+        if f'"{name}"' in ready:continue
+        extra.extend(['    new-instance v1, Ljava/io/File;',f'    const-string v2, "{name}"',
+                      '    invoke-direct {v1, p0, v2}, Ljava/io/File;-><init>(Ljava/lang/String;Ljava/lang/String;)V',
+                      f'    invoke-static {{v1, v2}}, {cat}->sample(Ljava/io/File;Ljava/lang/String;)Z',
+                      '    move-result v1',f'    if-nez v1, :winter_ready_{i}','    return v0',f'    :winter_ready_{i}'])
+    s=s[:start]+once(ready,anchor,anchor+'\n'.join(extra)+'\n')+s[end:]
     path.write_text(s)
     path=root/'CacheUpdates.smali';s=path.read_text()
     target='    iget-object p2, v1, Lblackrussia/online/CacheUpdates;->members:Ljava/util/Map;\n\n    invoke-interface {p1, p2}, Ljava/util/Map;->putAll(Ljava/util/Map;)V'
@@ -118,8 +130,10 @@ def package(base,assets,apktool,out,preview):
             # Constants belong to DoHeadLightBeam only. Increase the minimum angular
             # visibility of each existing beam. The vehicle keeps its dummy, switch and tint.
             for abi,edits_at in {
-                'arm64-v8a':[(0x1b24e4,'01902e1e','01502f1e'),(0x1b24e8,'0856a852','0846a852')],
-                'armeabi-v7a':[(0x123bd0,'b7ee044a','b7ee0a4a'),(0x123df4,'0000b042','00003042')]
+                'arm64-v8a':[(0x1b24e4,'01902e1e','01502f1e'),(0x1b24e8,'0856a852','0846a852'),
+                             (0x1b2670,'f5e30039','ffe30039'),(0x1b269c,'f5e70039','ffe70039')],
+                'armeabi-v7a':[(0x123bd0,'b7ee044a','b7ee0a4a'),(0x123df4,'0000b042','00003042'),
+                               (0x123cf8,'8df84420','8df84460'),(0x123cfc,'8df84320','8df84360')]
             }.items():
                 n=f'lib/{abi}/libmultiplayer.so';raw=bytearray(z.read(n))
                 for at,old,new in edits_at:
