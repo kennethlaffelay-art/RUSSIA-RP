@@ -42,7 +42,7 @@ if test "$EDITION" = winter; then
   app=unsigned.apk
   pkg=com.russiarp.snow
 elif test "$EDITION" = headlights; then
-  app="$RUNNER_TEMP/RUSSIA-RP-1.7.26-Winter-Lights.apk"
+  app="$RUNNER_TEMP/RUSSIA-RP-1.7.29-Winter-Graphics.apk"
   pkg=com.russiarp.winter27.lights
   fetch "$origin/russia-rp-v1.7.24-winter-weik/RUSSIA-RP-1.7.24-Winter-Weik.apk" winter-1724.apk
   apksigner verify --verbose "$app"
@@ -50,8 +50,8 @@ elif test "$EDITION" = headlights; then
   adb install -g "$RUNNER_TEMP/previous.apk"
   adb install -r -g "$app"
   adb shell pm path com.russiarp.winter27 | grep -q 'base.apk'
-  adb shell dumpsys package "$pkg" | grep -F 'versionName=1.7.26'
-  echo 'Upgraded Lights 1.7.25 alongside Winter Weik 1.7.24' >evidence/coexistence.txt
+  adb shell dumpsys package "$pkg" | grep -F 'versionName=1.7.29'
+  echo 'Upgraded Lights 1.7.28 alongside Winter Weik 1.7.24' >evidence/coexistence.txt
   adb uninstall "$pkg"
 elif test "$EDITION" = standalone; then
   pkg=com.russiarp.winter27
@@ -68,8 +68,8 @@ fi
 # Stage the same install that the production launcher verifies. Only the local test host differs.
 previous=baseline.apk
 if test "$EDITION" = headlights; then
-  previous=winter-1724.apk
-  echo "f4b7c000f567e8087da6f25d5414e657d80376a27e7a082b9253ceaec72b44fa  $previous" | sha256sum -c -
+  previous="$RUNNER_TEMP/previous.apk"
+  echo "ef08cda482db9e15bb3ba0824f70aefd9422e150b1b81b321523cc005b83109b  $previous" | sha256sum -c -
 fi
 python3 "$src/qa/stage.py" Weik "$previous" cache20.zip
 keytool -genkeypair -keystore qa.p12 -storetype PKCS12 -storepass android-test -keyalg RSA -keysize 2048 -alias qa -dname 'CN=Isolated Android QA' -validity 5
@@ -125,6 +125,13 @@ if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights 
   adb shell am instrument -w com.russiarp.qa.capture/com.russiarp.qa.CacheUpgrade >evidence/cache-upgrade.txt 2>&1
   cat evidence/cache-upgrade.txt
   grep -Fq 'verified offline, zero archive requests' evidence/cache-upgrade.txt
+  if test "$EDITION" = headlights; then
+    for file in texdb/txd/txd.dxt.dat texdb/txd/txd.dxt.tmb models/particle.txd data/timecyc.dat data/ctimecy.dat; do
+      expected=$(unzip -p "$app" assets/json/weik-cache.json | jq -r --arg file "$file" '.files[$file][0]')
+      actual=$(adb shell sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
+      test "$expected" = "$actual"
+    done
+  fi
   adb shell test -d /sdcard/Weik/texdb
   adb shell test ! -e /sdcard/RWin
 fi
@@ -137,7 +144,7 @@ for n in $(seq 1 30); do
   sleep 1
 done
 declare -A seen
-for n in $(seq 1 225); do
+for n in $(seq 1 330); do
   docker logs qa-server >evidence/server.txt 2>&1
   stage=$(awk '/RRP QA FRAME [0-9]+/{print $NF}' evidence/server.txt | tail -1)
   if [[ -n "$stage" && -z "${seen[$stage]:-}" ]]; then
@@ -180,21 +187,9 @@ done
 adb logcat -b crash -d >evidence/crash.txt
 adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || true
 grep -q 'RRP QA END' evidence/server.txt
-test "${#seen[@]}" = 23
+test "${#seen[@]}" = 38
 test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7
 
 if test "$EDITION" = headlights; then
-  python3 - <<'PYTHON'
-from PIL import Image, ImageChops
-# Fixed camera over the asphalt in frames 21/22. Exclude sky, UI and the car.
-with Image.open('evidence/world-21.png') as off, Image.open('evidence/world-22.png') as on:
-    width, height = on.size
-    road = (round(width * .15), round(height * .60), round(width * .39), round(height * .77))
-    diff = ImageChops.subtract(on.convert('RGB'), off.convert('RGB')).crop(road).convert('L')
-    histogram = diff.histogram()
-    brightened = sum(histogram[45:]) / sum(histogram)
-    print(f'Asphalt pixels brightened by at least 45 levels: {brightened:.1%}')
-    if brightened < .10:
-        raise SystemExit('Headlight core too faint on asphalt')
-PYTHON
+  python3 "$src/qa/optics.py" evidence
 fi

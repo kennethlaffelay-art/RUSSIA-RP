@@ -1,29 +1,36 @@
-name: Winter 1.7.26 headlight check and release
+name: Winter 1.7.29 materials and headlights
 on:
   push:
-    branches: [release/winter-1.7.26-headlights]
+    branches: [release/winter-1.7.29-rendering]
     paths: ['winter/2027/**', '.github/workflows/winter-headlights.yml']
 permissions:
   contents: read
 env:
-  APK: RUSSIA-RP-1.7.26-Winter-Lights.apk
-  SHA256: 0f2e331762b6ee69b22918f609efda48c5d287528727622919d9826cacf39ec4
+  APK: RUSSIA-RP-1.7.29-Winter-Graphics.apk
+  SHA256: d8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9
 jobs:
   headlights:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Restore the signed 1.7.26 candidate
+      - name: Restore the signed 1.7.29 candidate
         working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.25-winter-lights/RUSSIA-RP-1.7.25-Winter-Lights.apk" -o previous.apk
-          echo '9194a12e98eeb496c55767c880e1a5813e48e87ccaffd96dc69a52882e2b5988  previous.apk' | sha256sum -c -
-          cat "$GITHUB_WORKSPACE"/winter/2027/release/1.7.26/headlights.zst.* >headlights.zst
-          echo 'c87d783881413c6641cbb02afe86fd8293e97839b14f406dc9e198214c5737b9  headlights.zst' | sha256sum -c -
-          zstd -qd --long=27 --patch-from=previous.apk headlights.zst -o "$APK"
+          curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/russia-rp-v1.7.26-winter-lights/RUSSIA-RP-1.7.26-Winter-Lights.apk" -o base26.apk
+          echo '0f2e331762b6ee69b22918f609efda48c5d287528727622919d9826cacf39ec4  base26.apk' | sha256sum -c -
+          python3 -m venv "$RUNNER_TEMP/restore-env"
+          "$RUNNER_TEMP/restore-env/bin/pip" install bsdiff4==1.4.4
+          src="$GITHUB_WORKSPACE/winter/2027"
+          "$RUNNER_TEMP/restore-env/bin/python" "$src/qa/restore_release.py" base26.apk "$src/release/1.7.29" 28 previous.apk
+          "$RUNNER_TEMP/restore-env/bin/python" "$src/qa/restore_release.py" base26.apk "$src/release/1.7.29" 29 "$APK"
           echo "$SHA256  $APK" | sha256sum -c -
+      - name: Exercise both native lamp meshes on ARM64 and ARMv7
+        run: |
+          python3 -m venv "$RUNNER_TEMP/mesh-env"
+          "$RUNNER_TEMP/mesh-env/bin/pip" install 'unicorn==2.1.4' 'pyelftools==0.33'
+          "$RUNNER_TEMP/mesh-env/bin/python" winter/2027/qa/beam_mesh.py "$RUNNER_TEMP/$APK"
       - name: Upgrade the previous cache and record the lights on Android ARM64
         env:
           EDITION: headlights
@@ -56,15 +63,22 @@ jobs:
       - name: Publish Android client and in-game comparison
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: russia-rp-v1.7.26-winter-lights
+          TAG: russia-rp-v1.7.29-winter-graphics
         run: |
           set -euo pipefail
           echo "$SHA256  $APK" | sha256sum -c -
+          cp evidence/world-24.png headlamp-closeup.png
           cp evidence/world-21.png asphalt-off.png
           cp evidence/world-22.png asphalt-on.png
+          cp evidence/world-27.png snow-rear.png
+          cp evidence/world-29.png snow-side.png
+          cp evidence/world-31.png snow-front.png
+          cp evidence/world-34.png clear-coat.png
+          cp evidence/world-35.png side-light.png
+          cp evidence/world-36.png wet-road.png
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | jq -e --arg apk "$APK" --arg hash "sha256:$SHA256" 'any(.assets[]; .name==$apk and .digest==$hash)'
-            for asset in asphalt-off.png asphalt-on.png; do
+            for asset in asphalt-off.png asphalt-on.png headlamp-closeup.png snow-rear.png snow-side.png snow-front.png clear-coat.png side-light.png wet-road.png; do
               if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$asset"; then
                 gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
               fi
@@ -73,6 +87,6 @@ jobs:
           fi
           cp evidence/world-17.png lights-off.png
           cp evidence/world-18.png lights-on.png
-          gh release create "$TAG" "$APK" lights-off.png lights-on.png asphalt-off.png asphalt-on.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "RUSSIA RP 1.7.26 · Зима 2027 · Фары" \
-            --notes "Два более ярких и длинных луча фар. Файлы asphalt-off и asphalt-on показывают одну машину на асфальте на закате. Устанавливается поверх Winter Lights 1.7.25 или рядом с Winter Weik 1.7.24. Для проверки установленного кеша Weik разрешите доступ к файлам."
+          gh release create "$TAG" "$APK" lights-off.png lights-on.png asphalt-off.png asphalt-on.png headlamp-closeup.png snow-rear.png snow-side.png snow-front.png clear-coat.png side-light.png wet-road.png --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "RUSSIA RP 1.7.29 · Зима 2027 · Графика" \
+            --notes "Отражение на лаке зависит от угла взгляда. Блики огней на мокрой дороге получили мягкие края. Обновлены тени машин, мотоциклов и пешеходов, а также освещение в разную погоду. Устанавливается поверх 1.7.28."

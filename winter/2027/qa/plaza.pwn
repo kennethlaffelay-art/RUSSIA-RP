@@ -111,6 +111,52 @@ public Frame(p,step) {
             Camera(p,x-2.9,y+6.9,z+1.22,x,y+1.0,z+0.08);
         }
         case 22: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 23: {
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
+            Camera(p,x-1.75,y+4.2,z+0.80,x,y+1.7,z+0.02);
+        }
+        case 24: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 25: {
+            SetPlayerTime(p,23,0);SetPlayerPos(p,714.0,-2343.0,37.4);
+            SetVehiclePos(carA,714.0,-2343.0,37.15);SetVehicleZAngle(carA,0.0);
+            SetVehicleParamsEx(carA,1,0,0,0,0,0,0);PutPlayerInVehicle(p,carA,0);
+        }
+        case 26: { // A stable elevated chase view with the road ahead in frame.
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            RemovePlayerFromVehicle(p);SetPlayerPos(p,x+4.0,y-2.0,z+0.4);
+            Camera(p,x,y-6.0,z+5.0,x,y+5.0,z);
+        }
+        case 27: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 28: {
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
+            Camera(p,x+12.0,y+4.0,z+2.0,x,y+5.0,z);
+        }
+        case 29: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 30: {
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
+            Camera(p,x,y+13.5,z+2.4,x,y+3.0,z);
+        }
+        case 31: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 32: {
+            SetPlayerTime(p,13,0);SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            Camera(p,x-3.0,y-6.0,z+5.0,x,y+5.0,z);
+        }
+        case 33: SetVehicleParamsEx(carA,1,1,0,0,0,0,0);
+        case 34: {
+            SetPlayerTime(p,15,0);SetPlayerWeather(p,1);
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            Camera(p,x-4.3,y+3.8,z+1.05,x,y,z+0.05);
+        }
+        case 35: {
+            new Float:x,Float:y,Float:z;GetVehiclePos(carA,x,y,z);
+            Camera(p,x-5.8,y+.9,z+.72,x,y,z+.05);
+        }
+        case 36: {SetPlayerTime(p,20,0);SetPlayerWeather(p,8);}
+        case 37: SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);

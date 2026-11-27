@@ -14,6 +14,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, ZIP_STORED
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'android/russia-rp/branding'))
 from android_xml import Doc
+from vehicle_material import vehicle_material
 
 def once(source,old,new):
     if source.count(old)!=1:raise ValueError('Unexpected integration point '+old[:70])
@@ -78,7 +79,7 @@ def edit_dex(project,meta,manifest,preview,preview_id):
 '''+target)
     path.write_text(s)
     conf=project/'smali_classes3/com/wn/blackrussia/BuildConfig.smali'
-    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x32'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.26"')
+    s=once(once(conf.read_text(),'VERSION_CODE:I = 0x2e','VERSION_CODE:I = 0x35'),'VERSION_NAME:Ljava/lang/String; = "1.7.22"','VERSION_NAME:Ljava/lang/String; = "1.7.29"')
     if preview:s=s.replace('com.russiarp.hudx',preview_id)
     conf.write_text(s)
     if preview:
@@ -108,37 +109,75 @@ def edit_dex(project,meta,manifest,preview,preview_id):
         path.write_text(s)
 
 def headlight_renderer(data, library, abi):
-    # Both renderers use five vertices per headlamp. Keep the fully transparent
-    # far edge, the model transform and the original vehicle colour. A 14-unit
-    # reach with half-width 2.125 preserves the opening angle of the older beam.
-    # Peak alpha is 248 - 64 * abs(view dot forward), so the front three-quarter
-    # view still has a bright core. Source-over retains detail on white snow.
     tweaks = {
         ("libGame.so", "arm64-v8a"): [
+            # Use source-over and keep peak opacity in the 80..112 range.
             (0x6b48a4, "e1031f32", "c1008052"),
-            (0x6b48e8, "0856a852", "0850a852"),
-            (0x6b4970, "0b502e1e", "0b30201e"),
-            (0x6b49a4, "29590011", "29e10211"),
-            (0x6b49e8, "15d0231e", "1590251e"),
+            (0x6b48e8, "0856a852", "0840a852"),
+            (0x6b49a4, "29590011", "29410111"),
+            # Aim along the chassis with a 3/64 down-slope. Normalize its right vector for width.
+            (0x6b48f4, "280400d0", "08a8a752"),
+            (0x6b48fc, "07a94bbd", "0701271e"),
+            (0x6b493c, "e0430091e18300916398ed97", "6006402d620a40bd1f2003d5"),
+            # Far corners at +/-1.875 m over 12 m. Only the interior vertex is bright.
+            (0x6b4970, "0b502e1e", "0bd02f1e"),
+            (0x6b49e8, "15d0231e", "1510251e"),
+            (0x6b497c, "05102a1e", "0510201e"),
+            (0x6b49d4, "0b1800b90b3c00b9", "081800b9083c00b9"),
+            # Start both terrain projections a quarter metre ahead of the lamp.
+            (0x6b4c08, "02102e1e", "02102a1e"),
+            (0x6b4c54, "040980520509805206098052", "040e8052050e8052060e8052"),
+            (0x6b4cec, "b028251e", "06102a1e"),
+            (0x6b4d48, "040980520509805206098052", "040e8052050e8052060e8052"),
         ],
         ("libGame.so", "armeabi-v7a"): [
+            # Source-over, opacity and incline match ARM64.
             (0x59088a, "0221", "0621"),
-            (0x5908b8, "b7ee02ea", "b0ee01ea"),
-            (0x59097c, "b7ee045a", "b0ee0f5a"),
-            (0x5909a0, "b1ee0e6a", "b2ee0c6a"),
-            (0x590b64, "0000b042", "00008042"),
+            (0x59097c, "b7ee045a", "b0ee0c5a"),
+            (0x590b64, "0000b042", "00000042"),
+            (0x590b48, "9a99193e", "0000403d"),
+            # Copy chassis right to the local vector consumed by the existing normalize call.
+            (0x590912, "6e46294630464246faf738e73046", "94e8070000ae07c6684600bf00bf"),
+            # Set spread, reach, interior peak, and transparent near edges.
+            (0x5908b8, "b7ee02ea", "b7ee0eea"),
+            (0x5909a0, "b1ee0e6a", "b2ee086a"),
+            (0x590b60, "0000803e", "00000040"),
+            (0x590a70, "8261c263", "8361c363"),
+            # Start and brighten the single and twin terrain projections.
+            (0x590c4c, "b7ee007a", "b5ee007a"),
+            (0x590c72, "4823", "7023"),
+            (0x590d70, "b7ee005a", "b5ee005a"),
+            (0x590d7a, "4821", "7021"),
         ],
         ("libmultiplayer.so", "arm64-v8a"): [
-            (0x1b24e4, "01902e1e", "01f0211e"),
-            (0x1b24e8, "0856a852", "0850a852"),
-            (0x1b2630, "11d0231e", "1190251e"),
-            (0x1b264c, "16502e1e", "1630201e"),
+            # Native tinted fan, retaining the lamp colour selected by the server.
+            (0x1b24e4, "01902e1e", "0190211e"),
+            (0x1b24e8, "0856a852", "0840a852"),
+            (0x1b25a4, "48339352", "08a8a752"),
+            (0x1b25ac, "28c3a772", "1f2003d5"),
+            # Keep the forward vector on the stack. Use chassis right in place of the camera cross product.
+            (0x1b25f0, "e0130091e1430091", "1f2003d5620a40bd"),
+            (0x1b2600, "a82f0794", "6006402d"),
+            # Fade from half opacity at the lens to the interior peak, with zero-alpha far corners.
+            (0x1b2630, "11d0231e", "1110251e"),
+            (0x1b264c, "16502e1e", "16d02f1e"),
+            (0x1b2658, "a999995289c9a772", "0900a852ad7e0153"),
+            (0x1b2670, "f5e30039", "ede30039"),
+            (0x1b269c, "f5e70039", "ede70039"),
+            # The multiplayer table uses uint32_t. The RenderWare wrapper forwards its pointer to a uint16_t consumer.
+            (0x1b2790, "1f2003d528ffaf10e1030191000540ad0209c03d6000805282018052e21b803de00702ad", "48ffaf10000540ad0209c03d0018414e4228610ee1030191200800ad6000805282018052"),
         ],
         ("libmultiplayer.so", "armeabi-v7a"): [
-            (0x123bcc, "b7ee023a", "b0ee013a"),
-            (0x123bd0, "b7ee044a", "b0ee0f4a"),
-            (0x123bd4, "b1ee0e5a", "b2ee0c5a"),
-            (0x123df4, "0000b042", "00008042"),
+            # Use chassis right as the three inputs to the existing stack store/normalize sequence.
+            (0x123ba2, "01a804a942465df1baea01aa07ca", "94e8070000bf00bf00bf00bf00bf"),
+            # Match the tinted 64-bit mesh and its vertex opacity.
+            (0x123bcc, "b7ee023ab7ee044ab1ee0e5a", "b7ee0e3ab0ee0c4ab2ee085a"),
+            (0x123de4, "9a99193e", "0000403d"),
+            (0x123df0, "cdcc4c3e", "00000040"),
+            (0x123df4, "0000b042", "00000042"),
+            (0x123cf4, "adf845608df844208df84320", "520842ea0222cdf8432000bf"),
+            # Narrow all twelve source indices to RwImVertexIndex before the indexed draw.
+            (0x123d48, "60f9cd0a60f9cd2a60f9cf4a12a9084640f9cd0a40f9cd2a40f9cf4a03200c22", "60f9cd0260f9cf4af6ff2002f6ff2212f6ff242212a941f94f0603200c2200bf"),
         ],
     }
     result = bytearray(data)
@@ -166,7 +205,7 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
         run('b','-j','2',project,'-o',built)
         doc=Doc(z.read('AndroidManifest.xml'));root=doc.elements()[0]
         assert root.get('versionCode')==46
-        root.set('versionCode',16,50);root.set('versionName',3,doc.pool.add('1.7.26'))
+        root.set('versionCode',16,53);root.set('versionName',3,doc.pool.add('1.7.29'))
         if preview:
             doc.pool.values=[s.replace('com.russiarp.hudx',preview_id) for s in doc.pool.values]
             app=next(e for e in doc.elements() if e.tag=='application')
@@ -188,8 +227,9 @@ def package(base,assets,apktool,out,preview,r8=None,standalone=False):
                 for library in ('libGame.so', 'libmultiplayer.so'):
                     path = f'lib/{abi}/{library}'
                     renderer = headlight_renderer(z.read(path), library, abi)
+                    renderer = vehicle_material(renderer, library)
                     if library == 'libmultiplayer.so':
-                        renderer = once(renderer, b'RUSSIA RP 1.7.22%.0s', b'RUSSIA RP 1.7.26%.0s')
+                        renderer = once(renderer, b'RUSSIA RP 1.7.22%.0s', b'RUSSIA RP 1.7.29%.0s')
                     edits[path] = renderer
             def put(name,raw,method):
                 info=ZipInfo(name,(2026,1,1,0,0,0));info.compress_type=method

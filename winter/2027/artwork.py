@@ -76,39 +76,45 @@ def headlamp(original, name):
     x = 2 * (columns + 0.5) / width - 1
     distance = 1 - (rows + 0.5) / height
 
-    # The renderer projects either one lamp or a pair across the vehicle width.
-    # Both masks use the bottom edge as the bumper and widen towards the road.
     paired = name == 'headlight'
-    half_width = (0.036 + 0.35 * distance) if paired else (0.055 + 0.77 * distance)
-    centres = (-0.43, 0.43) if paired else (0.0,)
+    # The native twin projector's half-width is four times the lamp offset.
+    # The inner near peaks therefore sit at +/-0.25 in this UV space.
+    width_near, width_far = (0.055, 0.50) if paired else (0.10, 0.91)
+    half_width = width_near + (width_far - width_near) * distance
+    centres = (-1, 1) if paired else (0,)
     profile = np.zeros_like(x)
-    for centre in centres:
-        cross_section = np.abs(x - centre * (1 + 0.09 * distance)) / half_width
-        edge = np.clip((1 - cross_section) / 0.27, 0, 1)
-        feather = edge * edge * (3 - 2 * edge)
-        core = 1 - 0.24 * np.minimum(cross_section, 1) ** 2
-        profile = np.maximum(profile, feather * core)
+    for side in centres:
+        centre = side * (0.25 + 0.15 * distance)
+        radial = np.clip(np.abs(x - centre) / half_width, 0, 1)
+        # Zero value and slope at the outer boundary. No constant white plateau.
+        lobe = (1 - radial * radial) ** 2
+        profile = np.maximum(profile, lobe)
 
-    # Keep pavement visible close to the bumper and roll off the far edge.
-    fade = np.clip((1 - distance) / 0.26, 0, 1)
-    light = profile * (0.86 - 0.23 * distance) * fade * fade * (3 - 2 * fade)
-    tint = np.array([255, 244, 216])
-    if paired:
-        # Split energy across RGB and alpha for a smooth edge in either blend mode.
-        rgb = np.sqrt(light)[:, :, None] * tint
-        alpha = np.sqrt(light) * 225
-    else:
-        # This texture uses DXT1. Its black background is the additive neutral value.
-        rgb = light[:, :, None] * tint
-        alpha = np.full_like(light, 255)
-    pixels = np.dstack((rgb, alpha)).round().astype(np.uint8)
-    return Image.fromarray(pixels)
+    def smooth(value):
+        value = np.clip(value, 0, 1)
+        return value * value * (3 - 2 * value)
+
+    entrance = smooth((distance - 0.012) / 0.09)
+    extinction = 1 - smooth((distance - 0.42) / 0.56)
+    light = 0.93 * profile * entrance * extinction * (1 - 0.24 * distance)
+    rgb = light[:, :, None] * [255, 241, 210]
+    alpha = (np.sqrt(light) * 255) if paired else np.full_like(light, 255)
+    return Image.fromarray(np.dstack((rgb, alpha)).round().astype(np.uint8))
 
 def halo(original):
-    h,w=original.height,original.width
-    y,x=np.mgrid[:h,:w];r=((x+.5-w/2)/(w/2))**2+((y+.5-h/2)/(h/2))**2
-    a=np.uint8(240*np.exp(-r*5.5)*np.clip(1-r,0,1))
-    out=Image.new('RGBA',(w,h),(245,245,240));out.putalpha(Image.fromarray(a));return out
+    width, height = original.size
+    rows, cols = np.mgrid[:height, :width]
+    x = (cols + 0.5 - width / 2) / (width / 2)
+    y = (rows + 0.5 - height / 2) / (height / 2)
+    radius = (x / 0.92) ** 2 + (y / 0.78) ** 2
+    # Type 4 headlamp coronas add the RGB channels to the frame. Alpha alone
+    # cannot hide the quad. Leave a black rim even after mip/BC filtering.
+    edge = np.maximum(0, 1 - radius) ** 2
+    core = np.exp(-5.2 * radius) * edge
+    bloom = np.exp(-2.0 * radius) * edge
+    rgb = (0.80 * core + 0.20 * bloom)[:, :, None] * [255, 241, 201]
+    alpha = np.sqrt(bloom) * 255
+    return Image.fromarray(np.dstack((rgb, alpha)).round().astype(np.uint8))
 
 def snow_surface(original):
     p=np.array(original)

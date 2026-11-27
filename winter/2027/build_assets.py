@@ -14,6 +14,7 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.transformPen import TransformPen
 from resources import *
 from artwork import plate,woodlands,pine,headlamp,halo,snow_surface,ground_snow
+from materials import shadow_mask, wet_highlight, weather_lighting
 from lighting import timecycle,colorcycle,winter_sky
 from plaza import layout
 from snow import flurries
@@ -133,7 +134,8 @@ def texture_updates(root,apk,fontfile):
             code,_,_,length=struct.unpack_from('<IHHI',thumbs,pos)
             lookup.append((pos,thumbs[pos:pos+12+length]));pos+=12+length
         assert pos==len(thumbs)
-        names=['plate_ru','nomer'] if db!='txd' else ['headlight','headlight1','coronaheadlightline']
+        names=['plate_ru','nomer'] if db!='txd' else ['coronareflect','shad_car','shad_bike','shad_ped',
+                  'shad_car_dark','shad_bike_dark','shad_ped_dark','headlight','headlight1','coronaheadlightline']
         if db=='samp':names=['pinelo128']
         previous=[]
         if db=='gta_int':
@@ -153,6 +155,8 @@ def texture_updates(root,apk,fontfile):
             if n in ('plate_ru','nomer'):img=plate(t.size,fontfile)
             elif n in ('headlight','headlight1'):img=headlamp(t.image(),n)
             elif n=='coronaheadlightline':img=halo(t.image())
+            elif n=='coronareflect':img=wet_highlight(t.size)
+            elif n.startswith('shad_'):img=shadow_mask(t.image())
             elif n in ('pinebranch1','pinelo128'):img=pine(t.image())
             elif n in open_ground:img=ground_snow(t.image())
             elif n in surfaces:
@@ -177,6 +181,48 @@ def texture_updates(root,apk,fontfile):
             if int.from_bytes(rec[:2],'little') != (tag&65535):raise ValueError('Thumbnail identity '+n)
             changes.setdefault(path+'tmb',[]).append((off,thumbnail(rec,img)))
             print(db,n,t.size,flush=True)
+    return changes
+
+def particle_headlights(data):
+    """Update both XRGB light sprites and ARGB shadow masks in the particle dictionary."""
+    names = {'headlight', 'headlight1', 'coronaheadlightline', 'coronareflect', 'shad_car', 'shad_bike', 'shad_ped'}
+    changes = []
+    dictionary, size, _ = struct.unpack_from('<III', data)
+    if dictionary != 0x16 or size + 12 != len(data):
+        raise ValueError('Unexpected particle TXD')
+    cursor = 12
+    while cursor < len(data):
+        kind, size, _ = struct.unpack_from('<III', data, cursor)
+        start = cursor + 12
+        cursor = start + size
+        if kind != 0x15:
+            continue
+        tag, meta_size, _ = struct.unpack_from('<III', data, start)
+        header = start + 12
+        name = data[header+8:header+40].split(b'\0', 1)[0].decode('ascii')
+        if name not in names:
+            continue
+        platform, = struct.unpack_from('<I', data, header)
+        fmt, w, h, depth, mips, _, _, length = struct.unpack_from('<IHH4BI', data, header+76)
+        expected_format = 21 if name.startswith('shad_') else 22
+        if (tag, platform, fmt, depth, mips, length, meta_size) != (1, 9, expected_format, 32, 1, w*h*4, 92+w*h*4):
+            raise ValueError('Unexpected particle raster: ' + name)
+        raw = data[header+92:header+92+length]
+        original = Image.frombytes('RGBA', (w,h), raw, 'raw', 'BGRA')
+        if name.startswith('shad_'):
+            image = shadow_mask(original)
+        elif name == 'coronareflect':
+            image = wet_highlight((w,h))
+        elif name == 'coronaheadlightline':
+            image = halo(original)
+        else:
+            image = headlamp(original, name)
+        if fmt == 22:
+            image.putalpha(255)
+        changes.append((header+92, image.tobytes('raw', 'BGRA')))
+        names.remove(name)
+    if names or cursor != len(data):
+        raise ValueError('Incomplete particle dictionary')
     return changes
 
 def plaza_ground(stream,idx):
@@ -218,6 +264,8 @@ def build(apkfile,channel,root,out,fontfile,previous=None):
             if n=='data/colorcycle.dat':raw=colorcycle(raw)
             locals_[n]=raw
         patches=texture_updates(root,apk,fontfile)
+        particle = 'models/particle.txd'
+        patches[particle] = particle_headlights((root/particle).read_bytes())
         with (root/'texdb/gta_int.img').open('rb') as f:
             idx=img_index(f);floor=plaza_ground(f,idx)
         pos,size=idx['fakesnow1.dff']
@@ -225,7 +273,10 @@ def build(apkfile,channel,root,out,fontfile,previous=None):
         metadata={'bundled':{},'delta':{}}
         def save(n,data):
             p=out/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+        time_files = {'data/timecyc.dat','data/ctimecy.dat'}
         for n,raw in locals_.items():
+            if n in time_files:
+                raw=weather_lighting(raw)
             h=digest(raw);files[n]=[h,len(raw),0,len(raw),0]
             save('assets/weik-defaults/'+n,raw)
             at=max(0,len(raw)//2-12)
@@ -246,9 +297,11 @@ def build(apkfile,channel,root,out,fontfile,previous=None):
                 while buf:=stream.read(1048576):expected.update(buf)
             finalhash=expected.hexdigest();files[n]=[finalhash,*source[1:]]
             sample_off,sample_data=new[0]
-            # The two lamp revisions share transparent blocks at the start of both
-            # records. Sample inside the beam so 1.7.24 is actually upgraded.
-            sample_index = len(sample_data) // 2 if n.startswith('texdb/txd/') else 16
+            # Samples inside changed rasters distinguish the preceding Lights builds.
+            if n == particle:
+                sample_index = len(sample_data) // 2 + 128 * 4
+            else:
+                sample_index = len(sample_data) // 2 if n.startswith('texdb/txd/') else 16
             metadata['delta'][n]={'hash':finalhash,'source':source,'at':sample_off+sample_index,
                                   'sample':sample_data[sample_index:sample_index+24].hex()}
             save('assets/weik-defaults/'+n+'.patch',serialise_patch(sz,total))
@@ -261,7 +314,7 @@ def build(apkfile,channel,root,out,fontfile,previous=None):
             with ZipFile(previous) as release:
                 previous_files = json.loads(release.read('assets/json/weik-cache.json'))['files']
                 for name, ranges in metadata['delta'].items():
-                    if name.startswith('texdb/txd/'):
+                    if name == particle or name.startswith('texdb/txd/'):
                         continue
                     member = 'assets/weik-defaults/' + name + '.patch'
                     content = release.read(member)
@@ -275,8 +328,15 @@ def build(apkfile,channel,root,out,fontfile,previous=None):
                 for name, row in metadata['bundled'].items():
                     member = 'assets/weik-defaults/' + name
                     content = release.read(member)
+                    if name in time_files:
+                        original = content
+                        content = weather_lighting(original)
+                        # Pick a changed row instead of a comment or an interior slot.
+                        row['at'] = next(i for i,(a,b) in enumerate(zip(original,content)) if a != b)
+                        files[name] = [digest(content),len(content),0,len(content),0]
+                    else:
+                        files[name] = previous_files[name]
                     save(member, content)
-                    files[name] = previous_files[name]
                     row.update(size=len(content), sample=content[row['at']:row['at']+24].hex())
                 save('assets/russia/plate.ttf',release.read('assets/russia/plate.ttf'))
         save('assets/json/weik-cache.json',json.dumps(manifest,separators=(',',':')).encode())
