@@ -1,0 +1,5 @@
+Highest bright-pixel coverage in a lens window: 2.0%
+dusk asphalt: 20194 lit pixels, 0.0% near white
+night snow from behind: 19069 lit pixels, 0.0% near white
+night snow from the side: 14006 lit pixels, 0.0% near white
+night snow head-on: 98693 lit pixels, 0.0% near white

@@ -1,0 +1,23 @@
+Serving...
+adb: failed to install client-qa.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Package com.russiarp.winter27.lights signatures do not match previously installed version; ignoring!]
+Performing Incremental Install
+
+Exception occurred while executing 'install-incremental':
+java.lang.IllegalArgumentException: Incremental installation not allowed.
+	at com.android.server.pm.PackageInstallerSession.<init>(PackageInstallerSession.java:1082)
+	at com.android.server.pm.PackageInstallerService.createSessionInternal(PackageInstallerService.java:787)
+	at com.android.server.pm.PackageInstallerService.createSession(PackageInstallerService.java:519)
+	at com.android.server.pm.PackageManagerShellCommand.doCreateSession(PackageManagerShellCommand.java:3143)
+	at com.android.server.pm.PackageManagerShellCommand.doRunInstall(PackageManagerShellCommand.java:1341)
+	at com.android.server.pm.PackageManagerShellCommand.runIncrementalInstall(PackageManagerShellCommand.java:1299)
+	at com.android.server.pm.PackageManagerShellCommand.onCommand(PackageManagerShellCommand.java:197)
+	at com.android.modules.utils.BasicShellCommandHandler.exec(BasicShellCommandHandler.java:97)
+	at android.os.ShellCommand.exec(ShellCommand.java:38)
+	at com.android.server.pm.PackageManagerService.onShellCommand(PackageManagerService.java:24612)
+	at android.os.Binder.shellCommand(Binder.java:950)
+	at android.os.Binder.onTransact(Binder.java:834)
+	at android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:4818)
+	at com.android.server.pm.PackageManagerService.onTransact(PackageManagerService.java:8506)
+	at android.os.Binder.execTransactInternal(Binder.java:1184)
+	at android.os.Binder.execTransact(Binder.java:1143)
+Performing Streamed Install

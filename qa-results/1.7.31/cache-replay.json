@@ -1,14 +1,16 @@
 {
-  "candidate": "unsigned",
+  "candidate": "unsigned input to Android ARM64 QA",
+  "sha256": "e464a589080e0923b451c6c12ae06fa58cbcc83584d6454f4344d8968f84d410",
+  "package": "com.russiarp.winter27.lights",
   "versionName": "1.7.31",
   "versionCode": 55,
-  "package": "com.russiarp.winter27.lights",
-  "sha256": "fc834fd130731c993908d9c1e0d5c1058af1c4be5286818f9b29d671c42ef166",
   "manifestEntries": 324,
+  "framesPerVersion": 41,
+  "releaseUpdate": "blocked: original signing key unavailable",
   "verifiedOfflineFrom1730": [
     {
       "file": "loader/img/loader_skin.img",
-      "sha256": "413884775a7da6c1c5838cce4806995d9b1718a68bac9dcb7ebd7ad5ecbc0ccd"
+      "sha256": "8f8c559b14c307dd826de2eb110b844c37b0b831e6acd8f683f670488c8a3dbe"
     },
     {
       "file": "models/particle.txd",
