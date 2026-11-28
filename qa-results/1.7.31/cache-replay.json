@@ -1,13 +1,46 @@
 {
+  "openedSkyTexturesInLogTail": 8,
   "candidate": "unsigned input to Android ARM64 QA",
-  "sha256": "e464a589080e0923b451c6c12ae06fa58cbcc83584d6454f4344d8968f84d410",
+  "sha256": "348365ae8ae3f245131196bc1f999ca23f7a5f7b08d2d44876f808f2fe93c887",
   "package": "com.russiarp.winter27.lights",
   "versionName": "1.7.31",
   "versionCode": 55,
   "manifestEntries": 324,
-  "framesPerVersion": 41,
+  "framesPerVersion": 51,
   "releaseUpdate": "blocked: original signing key unavailable",
   "verifiedOfflineFrom1730": [
+    {
+      "file": "loader/BR_Nebo_Day.png",
+      "sha256": "7897887b558f4efab36b3d0855e958ae5ab0f505bc70a7a6fe6373b85e88d2f4"
+    },
+    {
+      "file": "loader/BR_Nebo_Day_blur.png",
+      "sha256": "385b3913452d4079cf6149a1937c747d3e098b121adc9ef4bfee1a47e2f4d5c3"
+    },
+    {
+      "file": "loader/BR_Nebo_Nght.png",
+      "sha256": "3131c258e3d9cd5882f0341611330134df81550dfc4b34ac7fa5e7be0ac5d50b"
+    },
+    {
+      "file": "loader/BR_Nebo_Nght_blur.png",
+      "sha256": "31a4fdeb5772adbcf1f8be8ac9ba740db47635d307ff1d11bfd072cb7432c1a2"
+    },
+    {
+      "file": "loader/BR_Nebo_Rasv.png",
+      "sha256": "e718899b48b1cb7877836c4f8f7aeb2d4ba37305d2553836c369103ac5edf4e2"
+    },
+    {
+      "file": "loader/BR_Nebo_Rasv_blur.png",
+      "sha256": "ddf6a23140237211ac076ec02b9f7a618d3191a1f746bca2da96d2ea414a690a"
+    },
+    {
+      "file": "loader/BR_Nebo_Zakat.png",
+      "sha256": "b924b322b16f7286a263292888afee6c375cf8e44f33189cf6c8589bd84b98a8"
+    },
+    {
+      "file": "loader/BR_Nebo_Zakat_blur.png",
+      "sha256": "5745710bc65778338efcbc0ba6d64f054a9b0c40a9a76deb73d96a226820380d"
+    },
     {
       "file": "loader/img/loader_skin.img",
       "sha256": "8f8c559b14c307dd826de2eb110b844c37b0b831e6acd8f683f670488c8a3dbe"

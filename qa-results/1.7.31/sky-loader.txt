@@ -1,0 +1,10 @@
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Rasv.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Rasv_blur.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Day.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Day_blur.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Zakat.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Zakat_blur.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Nght.png
+Open: /storage/emulated/0/Weik/loader/BR_Nebo_Nght_blur.png
+CSkyBox: купол из файла loader/BR_Sky_Rasv.dff
+CSkyBox: купол из файла loader/BR_Sky_Rasv_bl.dff

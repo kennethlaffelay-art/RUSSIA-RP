@@ -1,0 +1,48 @@
+{
+  "nativeLibraries": {
+    "lib/arm64-v8a/libGame.so": "cf820c9c948add8411e90a141344991956f9074efe7e17575dba2dc626e59c55",
+    "lib/arm64-v8a/libmultiplayer.so": "888138e6c772e087ec16eb14200c80610fe1fe07acc504d76bc7878edb6b445d",
+    "lib/armeabi-v7a/libGame.so": "3bcdc5ccf8fed4346fa355b43929c37143b0925e18ec07a32333b6d5a864c882",
+    "lib/armeabi-v7a/libmultiplayer.so": "83ce419762c4919bd49ba7d577a2b4b280d4fa986b318c100122079ba5b0a92a"
+  },
+  "skinBindings": {
+    "54": {
+      "model": "ofost",
+      "vertices": 3988,
+      "reshapedVertices": 1023,
+      "bones": 32,
+      "matchedTracks": {
+        "handsup": 26,
+        "walk_civi": 32
+      }
+    },
+    "291": {
+      "model": "paul",
+      "vertices": 6130,
+      "reshapedVertices": 4133,
+      "bones": 32,
+      "matchedTracks": {
+        "handsup": 26,
+        "walk_civi": 32
+      }
+    }
+  },
+  "skyMeshTextures": {
+    "Rasv": [
+      "BR_Nebo_Rasv.png",
+      "BR_Nebo_Rasv_blur.png"
+    ],
+    "Day": [
+      "BR_Nebo_Day.png",
+      "BR_Nebo_Day_blur.png"
+    ],
+    "Zakat": [
+      "BR_Nebo_Zakat.png",
+      "BR_Nebo_Zakat_blur.png"
+    ],
+    "Nght": [
+      "BR_Nebo_Nght.png",
+      "BR_Nebo_Nght_blur.png"
+    ]
+  }
+}
