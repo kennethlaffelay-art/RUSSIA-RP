@@ -136,7 +136,22 @@ FROM debian:bookworm-slim
 RUN dpkg --add-architecture i386 && apt-get -qq update && apt-get -qq install -y --no-install-recommends qemu-user libc6:i386 libstdc++6:i386 libatomic1:i386 zlib1g:i386
 DOCKER
 docker run --name qa-server --network container:qa-phone -v "$PWD/Server:/input:ro" --tmpfs /stage:rw,exec,size=256m -w /stage -d qa-loopback sh -ec 'cp -a /input/. .; LD_LIBRARY_PATH=qawno qemu-i386 qawno/pawncc gamemodes/plaza.pwn -iqawno/include -ogamemodes/plaza.amx; exec qemu-i386 ./omp-server'
-adb install -g client-qa.apk
+if test "$EDITION" = edition31; then
+  adb install release30.apk
+  if adb install -r client-qa.apk >evidence/release-signature-check.txt 2>&1; then
+    echo 'Unexpected acceptance of the isolated QA key' >&2
+    exit 1
+  fi
+  grep -F 'INSTALL_FAILED_UPDATE_INCOMPATIBLE' evidence/release-signature-check.txt
+  adb uninstall "$pkg"
+  apksigner sign --ks qa.p12 --ks-pass pass:android-test --out baseline-qa.apk release30.apk
+  adb install -g baseline-qa.apk
+  adb shell dumpsys package "$pkg" | grep -F versionName=1.7.30 > evidence/qa-upgrade.txt
+  adb install -r -g client-qa.apk >> evidence/qa-upgrade.txt
+  adb shell dumpsys package "$pkg" | grep -F versionName=1.7.31 >> evidence/qa-upgrade.txt
+else
+  adb install -g client-qa.apk
+fi
 adb install -t recorder/test.apk
 adb shell appops set --uid "$pkg" MANAGE_EXTERNAL_STORAGE allow
 adb shell input keyevent KEYCODE_WAKEUP
@@ -150,17 +165,19 @@ if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights 
   if test "$EDITION" = headlights; then
     for file in texdb/{txd/txd,gta_int/gta_int,loader_car/loader_car}.dxt.{dat,tmb}; do
       expected=$(unzip -p "$app" assets/json/weik-cache.json | jq -r --arg file "$file" '.files[$file][0]')
-      actual=$(adb shell sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
+      actual=$(adb shell -n sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
       test "$expected" = "$actual"
     done
   fi
   if test "$EDITION" = edition31; then
     jq -r '(.delta + .bundled) | keys[]' assets31/integration.json | while read -r file; do
       expected=$(jq -r --arg file "$file" '.files[$file][0]' assets31/assets/json/weik-cache.json)
-      actual=$(adb shell sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
+      actual=$(adb shell -n sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
       test "$expected" = "$actual"
       echo "$actual  $file" >>evidence/cache-sha256.txt
     done
+    test "$(wc -l < evidence/cache-sha256.txt)" -eq "$(jq '(.delta + .bundled) | length' assets31/integration.json)"
+    cp assets31/integration.json evidence/integration.json
   fi
   adb shell test -d /sdcard/Weik/texdb
   adb shell test ! -e /sdcard/RWin

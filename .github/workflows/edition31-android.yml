@@ -25,3 +25,10 @@ jobs:
         with:
           name: ${{ matrix.edition }}-android-evidence
           path: ${{ runner.temp }}/winter/evidence/
+      - name: Preserve the exact unsigned input of the successful ARM test
+        if: success() && matrix.edition == 'edition31'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUSSIA-RP-1.7.31-unsigned-for-signing
+          path: ${{ runner.temp }}/winter/unsigned.apk
+          if-no-files-found: error
