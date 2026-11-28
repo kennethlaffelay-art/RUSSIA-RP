@@ -11,7 +11,7 @@ GROUPS = {
     "propertyg cash gangg": "#338863",
     "barbers tshirt tattoo datedisco datedrink spray": "#7a6192",
     "race flag gym school": "#527f75",
-    "gangb gangn": "#367798", "gangy": "#ba8534", "gangp": "#865593",
+    "gangb": "#367798", "gangn": "#508da9", "gangy": "#ba8534", "gangp": "#865593",
 }
 COLORS = {name: color for keys, color in GROUPS.items() for name in keys.split()}
 MONOGRAMS = dict(catalinapink="C", cj="CJ", crash1="C", maddog="MD",
@@ -88,8 +88,10 @@ def radar(name, size=64):
         elif kind=='burger':
             d.pieslice((18,18,46,40),180,360, fill=IVORY);box((17,31,47,34),COPPER)
             poly([(19,37),(45,37),(41,42),(23,42)])
-        elif kind in ('coin','help'):
-            label('₽' if kind=='coin' else '?',25)
+        elif kind=='coin':
+            line([(26,43),(26,19),(36,19),(40,22),(40,27),(36,31),(23,31)],w=4)
+            line([(22,36),(36,36)],COPPER,3)
+        elif kind=='help': label('?',25)
         elif kind in ('car','parking'):
             poly([(17,32),(21,22),(40,22),(46,32),(46,41),(42,41),(41,38),(23,38),(22,41),(17,41)])
             poly([(22,29),(25,25),(38,25),(41,29)],INK)
