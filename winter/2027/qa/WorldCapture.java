@@ -28,7 +28,12 @@ public final class WorldCapture extends Instrumentation {
             File request = new File(dir, "capture.request");
             File joined = new File(dir, "spawn.complete");
             Handler main = new Handler(Looper.getMainLooper());
-            for (int rounds = 0; rounds < 2600; rounds++) {
+            File complete = new File(dir, "route.complete");
+            long deadline = android.os.SystemClock.elapsedRealtime() + TimeUnit.MINUTES.toMillis(12);
+            while (!complete.exists()) {
+                if (android.os.SystemClock.elapsedRealtime() >= deadline) {
+                    throw new IllegalStateException("Timed out waiting for the camera route");
+                }
                 if (joined.delete()) {
                     // The stock open.mp test host has no Moscow server-selector UI protocol.
                     // Use the client's normal dismissal callback after its actual spawn RPC.

@@ -186,12 +186,13 @@ adb logcat -c
 # Launch the real native activity with the loopback settings already written.
 record_dir="/sdcard/Android/data/$pkg/files"
 adb shell am instrument -w com.russiarp.qa.capture/com.russiarp.qa.WorldCapture >evidence/recorder.txt 2>&1 &
+recorder_pid=$!
 for n in $(seq 1 30); do
   if adb shell pidof "$pkg" >/dev/null; then break; fi
   sleep 1
 done
 declare -A seen
-for n in $(seq 1 330); do
+for n in $(seq 1 660); do
   docker logs qa-server >evidence/server.txt 2>&1
   stage=$(awk '/RRP QA FRAME [0-9]+/{print $NF}' evidence/server.txt | tail -1)
   if [[ -n "$stage" && -z "${seen[$stage]:-}" ]]; then
@@ -234,7 +235,11 @@ done
 adb logcat -b crash -d >evidence/crash.txt
 adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || true
 grep -q 'RRP QA END' evidence/server.txt
+adb shell touch "$record_dir/route.complete"
+wait "$recorder_pid"
+grep -q 'INSTRUMENTATION_CODE: -1' evidence/recorder.txt
 test "${#seen[@]}" = "$expected_frames"
+for ((frame=0; frame<expected_frames; frame++)); do test -s "evidence/world-$frame.png"; done
 test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7
 
 if [[ "$EDITION" = headlights || "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then
