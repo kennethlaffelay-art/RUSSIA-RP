@@ -20,7 +20,7 @@ def once(source,old,new):
     if source.count(old)!=1:raise ValueError('Unexpected integration point '+old[:70])
     return source.replace(old,new)
 
-def edit_dex(project,meta,manifest,preview,preview_id):
+def edit_catalog(project, meta, sample_anchor):
     pkg='Lblackrussia/online/'
     cat=pkg+'WinterCatalog;'
     root=project/'smali_classes6/blackrussia/online'
@@ -39,7 +39,7 @@ def edit_dex(project,meta,manifest,preview,preview_id):
                       f'    invoke-direct/range {{v0 .. v8}}, {pkg}WeikCache$Entry;-><init>(Ljava/lang/String;JJJI)V',
                       '    return-object v0',f'    :winter_base_{i}' ])
     s=once(s,target,target+'\n'+'\n'.join(route)+'\n    :winter_base_done')
-    target='    :cond_0\n    invoke-virtual {p1}, Ljava/lang/String;->hashCode()I'
+    target=sample_anchor
     samples=[]
     for i,(name,row) in enumerate({**meta['bundled'],**meta['delta']}.items()):
         size=row['size'] if 'size' in row else row['source'][1]
@@ -65,6 +65,10 @@ def edit_dex(project,meta,manifest,preview,preview_id):
                       '    move-result v1',f'    if-nez v1, :winter_ready_{i}','    return v0',f'    :winter_ready_{i}'])
     s=s[:start]+once(ready,anchor,anchor+'\n'.join(extra)+'\n')+s[end:]
     path.write_text(s)
+
+def edit_dex(project,meta,manifest,preview,preview_id):
+    root=project/'smali_classes6/blackrussia/online'
+    edit_catalog(project,meta,'    :cond_0\n    invoke-virtual {p1}, Ljava/lang/String;->hashCode()I')
     path=root/'CacheUpdates.smali';s=path.read_text()
     target='    iget-object p2, v1, Lblackrussia/online/CacheUpdates;->members:Ljava/util/Map;\n\n    invoke-interface {p1, p2}, Ljava/util/Map;->putAll(Ljava/util/Map;)V'
     # This APK embeds all of channel 20. An authentic newer channel can supersede it.

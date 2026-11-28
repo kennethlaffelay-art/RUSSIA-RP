@@ -41,6 +41,21 @@ if test "$EDITION" = winter; then
   env/bin/python "$src/package.py" baseline.apk assets-out apktool.jar unsigned.apk --preview --r8 recorder/r8.jar
   app=unsigned.apk
   pkg=com.russiarp.snow
+elif [[ "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then
+  pkg=com.russiarp.winter27.lights
+  fetch "$origin/russia-rp-v1.7.30-winter-vehicles/RUSSIA-RP-1.7.30-Winter-Vehicles.apk" release30.apk
+  echo 'ac2b0163930ffc700f9f98c73425a7f98377babb4f51fae172298b3f2525141c  release30.apk' | sha256sum -c -
+  app=release30.apk
+  if test "$EDITION" = edition31; then
+    git clone -q https://github.com/Parik27/DragonFF.git dragon
+    git -C dragon checkout -q 319847f7803f102c5aa31fa38e8b3284117db40a
+    python3 -m venv env
+    env/bin/pip install Pillow==12.2.0 numpy
+    fetch https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar apktool.jar
+    PYTHONPATH=dragon env/bin/python "$src/edition31/cache31.py" Weik release30.apk assets31
+    env/bin/python "$src/edition31/candidate.py" release30.apk assets31 apktool.jar unsigned.apk
+    app=unsigned.apk
+  fi
 elif test "$EDITION" = headlights; then
   app="$RUNNER_TEMP/RUSSIA-RP-1.7.30-Winter-Vehicles.apk"
   pkg=com.russiarp.winter27.lights
@@ -67,6 +82,7 @@ elif test "$EDITION" = standalone; then
 fi
 # Stage the same install that the production launcher verifies. Only the local test host differs.
 previous=baseline.apk
+if [[ "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then previous=release30.apk; fi
 if test "$EDITION" = headlights; then
   previous="$RUNNER_TEMP/previous.apk"
   echo "d8a6bd7bc45fbcf89ea985664658bfd799eafa2ba4954505be2a34d3d5ba93a9  $previous" | sha256sum -c -
@@ -121,7 +137,7 @@ adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb push Weik/. "/sdcard/$root/" >push.log
-if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights ]]; then
+if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights || "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then
   adb shell am instrument -w com.russiarp.qa.capture/com.russiarp.qa.CacheUpgrade >evidence/cache-upgrade.txt 2>&1
   cat evidence/cache-upgrade.txt
   grep -Fq 'verified offline, zero archive requests' evidence/cache-upgrade.txt
@@ -130,6 +146,14 @@ if [[ "$EDITION" = winter || "$EDITION" = standalone || "$EDITION" = headlights 
       expected=$(unzip -p "$app" assets/json/weik-cache.json | jq -r --arg file "$file" '.files[$file][0]')
       actual=$(adb shell sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
       test "$expected" = "$actual"
+    done
+  fi
+  if test "$EDITION" = edition31; then
+    jq -r '(.delta + .bundled) | keys[]' assets31/integration.json | while read -r file; do
+      expected=$(jq -r --arg file "$file" '.files[$file][0]' assets31/assets/json/weik-cache.json)
+      actual=$(adb shell sha256sum "/sdcard/Weik/$file" | cut -d' ' -f1)
+      test "$expected" = "$actual"
+      echo "$actual  $file" >>evidence/cache-sha256.txt
     done
   fi
   adb shell test -d /sdcard/Weik/texdb
