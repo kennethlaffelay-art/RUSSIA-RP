@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZipInfo
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from scene_shader import scene_shader
 from package import Doc, edit_catalog, once
 
 BASE_SHA = 'ac2b0163930ffc700f9f98c73425a7f98377babb4f51fae172298b3f2525141c'
@@ -63,6 +64,8 @@ def build(base, assets, apktool, output):
                     raw = doc.encode()
                 else:
                     raw = z.read(n)
+                    if n.endswith(('/libmultiplayer.so','/libGame.so')):
+                        raw = scene_shader(raw,n.rsplit('/',1)[1])
                     if n.endswith('/libmultiplayer.so'):
                         raw = once(raw,b'RUSSIA RP 1.7.30%.0s',b'RUSSIA RP 1.7.31%.0s')
                 put(n,raw,entry.compress_type)

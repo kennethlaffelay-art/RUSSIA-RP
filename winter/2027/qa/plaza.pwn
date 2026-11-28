@@ -169,6 +169,22 @@ public Frame(p,step) {
             CreatePlayerObject(p,19135,719.0,-2343.0,38.0,0.0,0.0,0.0,80.0);
             Camera(p,718.0,-2346.5,38.4,719.0,-2343.0,38.0);
         }
+        case 41: {
+            SetPlayerPos(p,718.0,-2325.0,37.4);SetPlayerWeather(p,1);SetPlayerTime(p,6,30);
+            Camera(p,718.0,-2325.0,42.0,716.0,-2280.0,60.0);
+        }
+        case 42: SetPlayerTime(p,13,0);
+        case 43: SetPlayerTime(p,19,0);
+        case 44: SetPlayerTime(p,0,0);
+        case 45: {
+            SetPlayerTime(p,12,0);SetPlayerSkin(p,54);SetPlayerFacingAngle(p,180.0);
+            Camera(p,717.5,-2328.0,38.0,718.0,-2325.0,37.7);
+        }
+        case 46: ApplyAnimation(p,"PED","handsup",4.1,false,true,true,true,0);
+        case 47: ApplyAnimation(p,"PED","WALK_civi",4.1,true,true,true,false,0);
+        case 48: {ClearAnimations(p);SetPlayerSkin(p,291);}
+        case 49: ApplyAnimation(p,"PED","handsup",4.1,false,true,true,true,0);
+        case 50: ApplyAnimation(p,"PED","WALK_civi",4.1,true,true,true,false,0);
 #endif
         default: {print("RRP QA END");return 1;}
     }

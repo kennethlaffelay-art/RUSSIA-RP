@@ -8,6 +8,7 @@ from zipfile import ZipFile
 from map_assets import PREFIX, PREVIOUS_SHA, edits
 from resources import merge_ranges, patch_ranges, serialise_patch
 from surfaces import MATERIALS, lamp_edits, texture_edits
+from scene import sky_images
 from skins import garment_edits
 
 
@@ -71,6 +72,18 @@ def build(root, apk, out):
             dest = out/path
             dest.parent.mkdir(parents=True,exist_ok=True)
             dest.write_bytes(content)
+        for name, data in sky_images(root):
+            row = manifest['files'][name]
+            path = PREFIX+name
+            old = z.read(path) if path in z.namelist() else (root/name).read_bytes()
+            if sha(old)!=row[0]:
+                raise ValueError('Wrong sky baseline '+name)
+            manifest['files'][name] = [sha(data),len(data),0,len(data),0]
+            at = len(data)//2
+            meta['bundled'][name] = dict(size=len(data),at=at,sample=data[at:at+24].hex())
+            dest = out/path
+            dest.parent.mkdir(parents=True,exist_ok=True)
+            dest.write_bytes(data)
     (assets/'json').mkdir(parents=True,exist_ok=True)
     (assets/'json/weik-cache.json').write_text(json.dumps(manifest,separators=(',',':')))
     (out/'integration.json').write_text(json.dumps(meta,indent=2)+'\n')

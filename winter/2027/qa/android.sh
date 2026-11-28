@@ -118,7 +118,7 @@ cp "$src/qa/plaza.pwn" Server/gamemodes/
 expected_frames=38
 if [[ "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then
   sed -i '1i#define EDITION31_SCENES' Server/gamemodes/plaza.pwn
-  expected_frames=41
+  expected_frames=51
   sha256sum "$app" > evidence/input-apk.sha256
 fi
 python3 - <<'PY'

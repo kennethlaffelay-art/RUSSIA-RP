@@ -3,12 +3,14 @@ import re
 import numpy as np
 from gtaLib import dff
 from resources import img_index
+from rig import animation_tracks, check_rig
 
 MODELS = {54: ('ofost', {'fsbagent_shirt','fsbagent_armor'}),
           291: ('paul', {'350bomber7','350hood7'})}
 
 
 def garment_edits(root):
+    clips = animation_tracks(root/'anim/ped.ifp')
     catalog = (root/'SAMP/peds.ide').read_text('latin1')
     with (root/'loader/img/loader_skin.img').open('rb') as stream:
         entries = img_index(stream)
@@ -43,4 +45,9 @@ def garment_edits(root):
             for indices in groups.values():
                 normal = normals[indices].mean(axis=0)
                 xyz[indices] += normal*(.007/max(np.linalg.norm(normal),1e-6))
-            yield start+raw.index(original),xyz.tobytes()
+            at = raw.index(original)
+            replacement = xyz.tobytes()
+            changed = dff.dff()
+            changed.load_memory(raw[:at]+replacement+raw[at+len(original):])
+            check_rig(changed.clumps[0],clips)
+            yield start+at,replacement
