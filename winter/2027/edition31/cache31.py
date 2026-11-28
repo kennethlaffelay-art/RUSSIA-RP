@@ -1,5 +1,4 @@
 """Assemble bundled files and cumulative WS14 patches against published 1.7.30."""
-import argparse
 import hashlib
 import json
 from pathlib import Path

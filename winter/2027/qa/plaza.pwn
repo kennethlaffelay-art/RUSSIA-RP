@@ -157,6 +157,19 @@ public Frame(p,step) {
         }
         case 36: {SetPlayerTime(p,20,0);SetPlayerWeather(p,8);}
         case 37: SetVehicleParamsEx(carA,1,0,0,0,0,0,0);
+#if defined EDITION31_SCENES
+        case 38: {
+            SetPlayerTime(p,12,0);SetPlayerWeather(p,1);
+            SetPlayerSkin(p,54);SetPlayerPos(p,719.0,-2342.0,37.4);
+            SetPlayerFacingAngle(p,180.0);
+            Camera(p,718.5,-2345.0,38.0,719.0,-2342.0,37.7);
+        }
+        case 39: SetPlayerSkin(p,291);
+        case 40: {
+            CreatePlayerObject(p,19135,719.0,-2343.0,38.0,0.0,0.0,0.0,80.0);
+            Camera(p,718.0,-2346.5,38.4,719.0,-2343.0,38.0);
+        }
+#endif
         default: {print("RRP QA END");return 1;}
     }
     printf("RRP QA FRAME %d",step);

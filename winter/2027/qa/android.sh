@@ -115,6 +115,12 @@ echo '0cdc9690ea421dead02560f6c550c68ea17540d00a27eed4c8b6e3b0841afbe6  plates-q
 tar xOf plates-qa.tar.gz pawnraknet.so >Server/components/pawnraknet.so
 tar xOf plates-qa.tar.gz Pawn.RakNet.inc >Server/qawno/include/Pawn.RakNet.inc
 cp "$src/qa/plaza.pwn" Server/gamemodes/
+expected_frames=38
+if [[ "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then
+  sed -i '1i#define EDITION31_SCENES' Server/gamemodes/plaza.pwn
+  expected_frames=41
+  sha256sum "$app" > evidence/input-apk.sha256
+fi
 python3 - <<'PY'
 from pathlib import Path
 import json
@@ -211,9 +217,9 @@ done
 adb logcat -b crash -d >evidence/crash.txt
 adb shell "tail -120 /sdcard/$root/reBRClientLog.txt" >evidence/client.txt || true
 grep -q 'RRP QA END' evidence/server.txt
-test "${#seen[@]}" = 38
+test "${#seen[@]}" = "$expected_frames"
 test "$(sha256sum evidence/scene-*.png | cut -d' ' -f1 | sort -u | wc -l)" -ge 7
 
-if test "$EDITION" = headlights; then
-  python3 "$src/qa/optics.py" evidence
+if [[ "$EDITION" = headlights || "$EDITION" = edition31 || "$EDITION" = edition30-control ]]; then
+  python3 "$src/qa/optics.py" evidence | tee evidence/optics.txt
 fi

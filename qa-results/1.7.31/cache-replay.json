@@ -1,0 +1,50 @@
+{
+  "candidate": "unsigned",
+  "versionName": "1.7.31",
+  "versionCode": 55,
+  "package": "com.russiarp.winter27.lights",
+  "sha256": "fc834fd130731c993908d9c1e0d5c1058af1c4be5286818f9b29d671c42ef166",
+  "manifestEntries": 324,
+  "verifiedOfflineFrom1730": [
+    {
+      "file": "loader/img/loader_skin.img",
+      "sha256": "413884775a7da6c1c5838cce4806995d9b1718a68bac9dcb7ebd7ad5ecbc0ccd"
+    },
+    {
+      "file": "models/particle.txd",
+      "sha256": "a16bae84e89705655b2311898077de098604aa8d683fd897a75624693f415302"
+    },
+    {
+      "file": "texdb/gta3.img",
+      "sha256": "eabc90539e14527ab582cb8412418c1ec235bd5d2b3f9cc433e21e80e0890b97"
+    },
+    {
+      "file": "texdb/gta_int.img",
+      "sha256": "9c92c09170738cee910f0f9f1c2b42b13f4bec75c2e56ef6fbb3421911b7fdf6"
+    },
+    {
+      "file": "texdb/gta_int/gta_int.dxt.dat",
+      "sha256": "7d3912e2ce8e9ab17ad40c47dd7eb18e044ccb0c88ae1f0b19f3aba43d467e67"
+    },
+    {
+      "file": "texdb/loader_car/loader_car.dxt.dat",
+      "sha256": "9d7405a88dd5a14daaabdac7ed7aa0c3379f5e22bb56f262d4b4ca5e22cd268f"
+    },
+    {
+      "file": "texdb/loader_skin/loader_skin.dxt.dat",
+      "sha256": "e98a842060e743e865728e1cbef299ba9a6490f505c96579327b999827fe27db"
+    },
+    {
+      "file": "texdb/samp.img",
+      "sha256": "65d1c671978d811668697fe0b755d68c30e8e7978a697e73eed7e47ca4c35906"
+    },
+    {
+      "file": "texdb/txd/txd.dxt.dat",
+      "sha256": "e5f9ddc0f7a32ed733fb00ad0fb7ac42a8897eeee6b616470f7c0d3ee6adfaeb"
+    },
+    {
+      "file": "texdb/txd/txd.dxt.tmb",
+      "sha256": "a9e2761c629ba5798305c617fc2c82352f54719a7d2263e0a9dfd45b66e8826a"
+    }
+  ]
+}
